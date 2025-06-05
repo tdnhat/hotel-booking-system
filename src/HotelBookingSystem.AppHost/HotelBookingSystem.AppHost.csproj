@@ -7,13 +7,11 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <UserSecretsId>9efe563f-4326-41a6-a0cf-000ede9bc745</UserSecretsId>
+    <UserSecretsId>75565dcb-2cc9-40d8-86b6-cf9089b21ec6</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting.AppHost" Version="9.3.0" />
-    <PackageReference Include="Aspire.Hosting.PostgreSQL" Version="9.3.0" />
-    <PackageReference Include="Aspire.StackExchange.Redis" Version="9.3.0" />
   </ItemGroup>
 
   <ItemGroup>
