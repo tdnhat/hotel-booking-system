@@ -28,20 +28,27 @@ jobs:
               run: dotnet workload install aspire
 
             - name: Restore dependencies
-              run: dotnet restore src/
+              run: dotnet restore HotelBookingSystem.sln
 
             - name: Build solution
-              run: dotnet build src/ --no-restore --configuration Release
+              run: dotnet build HotelBookingSystem.sln --no-restore --configuration Release
 
             - name: Run unit tests
-              run: dotnet test src/ --no-build --configuration Release --verbosity normal --collect:"XPlat Code Coverage"
+              run: dotnet test HotelBookingSystem.sln --no-build --configuration Release --verbosity normal --collect:"XPlat Code Coverage" --logger trx --results-directory TestResults/
+
+            - name: Upload test results
+              uses: actions/upload-artifact@v4
+              if: always()
+              with:
+                  name: test-results
+                  path: TestResults/
 
             - name: Upload coverage reports
               uses: codecov/codecov-action@v4
               if: success()
               with:
-                  directory: ./src/TestResults/
-                  fail_ci_if_error: true
+                  directory: ./TestResults/
+                  fail_ci_if_error: false
 
     code-quality:
         name: Code Quality Analysis
@@ -60,10 +67,10 @@ jobs:
               run: dotnet workload install aspire
 
             - name: Restore dependencies
-              run: dotnet restore src/
+              run: dotnet restore HotelBookingSystem.sln
 
             - name: Run code analysis
-              run: dotnet build src/ --configuration Release --verbosity normal /p:TreatWarningsAsErrors=true
+              run: dotnet build HotelBookingSystem.sln --configuration Release --verbosity normal /p:TreatWarningsAsErrors=true
 
     security-scan:
         name: Security Scan
@@ -82,10 +89,10 @@ jobs:
               run: dotnet workload install aspire
 
             - name: Restore dependencies
-              run: dotnet restore src/
+              run: dotnet restore HotelBookingSystem.sln
 
             - name: Run security audit
-              run: dotnet list src/ package --vulnerable --include-transitive
+              run: dotnet list HotelBookingSystem.sln package --vulnerable --include-transitive
 
     docker-build:
         name: Docker Build
@@ -169,13 +176,13 @@ jobs:
               run: dotnet workload install aspire
 
             - name: Restore dependencies
-              run: dotnet restore src/
+              run: dotnet restore HotelBookingSystem.sln
 
             - name: Build solution
-              run: dotnet build src/ --no-restore --configuration Release
+              run: dotnet build HotelBookingSystem.sln --no-restore --configuration Release
 
             - name: Run integration tests
-              run: dotnet test src/ --filter "Category=Integration" --no-build --configuration Release
+              run: dotnet test HotelBookingSystem.sln --filter "Category=Integration" --no-build --configuration Release --logger trx --results-directory TestResults/
               env:
                   ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=hotelbooking_test;Username=postgres;Password=postgres"
                   ConnectionStrings__Redis: "localhost:6379"
@@ -200,7 +207,7 @@ jobs:
               run: dotnet workload install aspire
 
             - name: Restore dependencies
-              run: dotnet restore src/
+              run: dotnet restore HotelBookingSystem.sln
 
             - name: Publish BookingService API
               run: dotnet publish src/BookingService/HotelBookingSystem.BookingService.Api/HotelBookingSystem.BookingService.Api.csproj --configuration Release --output ./publish/booking-service
