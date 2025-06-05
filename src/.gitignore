@@ -1,0 +1,76 @@
+# Build results
+bin/
+obj/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# VS Code settings
+.vscode/
+
+# Visual Studio files
+.vs/
+
+# Rider IDE files
+.idea/
+
+# NuGet packages
+*.nupkg
+*.snupkg
+packages/
+# Optional: if you use a local NuGet feed
+*.nuspec
+
+# Logs
+*.log
+
+# Azure functions local settings
+local.settings.json
+
+# ASP.NET Scaffolding
+ScaffoldingReadMe.txt
+
+# Publish output
+publish/
+out/
+
+# Resharper
+_ReSharper*/
+*.DotSettings.user
+
+# DotCover
+*.dotCover
+
+# Coverage reports
+coverage/
+coverage*.json
+coverage*.xml
+coverage*.info
+.nyc_output/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Entity Framework Core Migrations
+Migrations/
+
+# Logs
+logs/
+
+# Others
+*.swp
+*.bak
+*.old
+*.orig
+
+# Docker related
+**/docker-compose.override.yml
+docker-compose.override.yml
+
+# Modules.User specific exclusions
+Modules.User/bin/
+Modules.User/obj/
+
+**/obj/
