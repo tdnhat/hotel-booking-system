@@ -7,7 +7,20 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.3.0" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.5" />
+	<PackageReference Include="Swashbuckle.AspNetCore" Version="8.1.2" />
+    <PackageReference Include="MediatR" Version="12.5.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.5">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\HotelBookingSystem.RoomManagementService.Application\HotelBookingSystem.RoomManagementService.Application.csproj" />
+    <ProjectReference Include="..\HotelBookingSystem.RoomManagementService.Infrastructure\HotelBookingSystem.RoomManagementService.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\HotelBookingSystem.ServiceDefaults\HotelBookingSystem.ServiceDefaults.csproj" />
   </ItemGroup>
 
 </Project>
