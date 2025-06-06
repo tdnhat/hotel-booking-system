@@ -24,9 +24,13 @@ namespace HotelBookingSystem.RoomManagementService.Infrastructure.Data.Seeding
                 var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
                 var seedingCoordinator = scope.ServiceProvider.GetRequiredService<DatabaseSeedingCoordinator>();
 
-                _logger.LogInformation("Starting data seeding...");
+                _logger.LogInformation("Starting data seeding for {ServiceName}...", nameof(DataSeedingService));
+                var startTime = DateTime.UtcNow;
+
                 await seedingCoordinator.SeedAsync(unitOfWork, cancellationToken);
-                _logger.LogInformation("Data seeding completed.");
+
+                var duration = DateTime.UtcNow - startTime;
+                _logger.LogInformation("Data seeding completed in {Duration} seconds.", duration.TotalSeconds);
             }
             catch (Exception ex)
             {
@@ -35,6 +39,10 @@ namespace HotelBookingSystem.RoomManagementService.Infrastructure.Data.Seeding
             }
         }
 
-        public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task StopAsync(CancellationToken cancellationToken)
+        {
+            _logger.LogInformation("Data seeding service is stopping.");
+            return Task.CompletedTask;
+        }
     }
 } 
