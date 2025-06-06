@@ -1,4 +1,5 @@
 using HotelBookingSystem.RoomManagementService.Api.Extensions;
+using HotelBookingSystem.RoomManagementService.Application;
 using HotelBookingSystem.RoomManagementService.Application.Queries.GetRoomTypes;
 using HotelBookingSystem.RoomManagementService.Infrastructure;
 using HotelBookingSystem.RoomManagementService.Infrastructure.Data;
@@ -36,11 +37,10 @@ try
         });
     });
 
-    // Add MediatR
-    builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(GetRoomTypesQuery).Assembly));
-
     // Add Infrastructure services
-    builder.Services.AddInfrastructure(builder.Configuration);
+    builder.Services
+        .AddApplication()
+        .AddInfrastructure(builder.Configuration);
 
     var app = builder.Build();
 
