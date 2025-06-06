@@ -15,9 +15,9 @@
     <PackageReference Include="Aspire.Hosting.PostgreSQL" Version="9.3.0" />
     <PackageReference Include="Aspire.StackExchange.Redis" Version="9.3.0" />
   </ItemGroup>
-
   <ItemGroup>
     <ProjectReference Include="..\BookingService\HotelBookingSystem.BookingService.Api\HotelBookingSystem.BookingService.Api.csproj" />
+    <ProjectReference Include="..\RoomManagementService\HotelBookingSystem.RoomManagementService.Api\HotelBookingSystem.RoomManagementService.Api.csproj" />
     <ProjectReference Include="..\HotelBookingSystem.ServiceDefaults\HotelBookingSystem.ServiceDefaults.csproj" />
   </ItemGroup>
 
