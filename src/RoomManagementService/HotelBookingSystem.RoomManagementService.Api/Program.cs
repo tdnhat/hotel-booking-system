@@ -1,6 +1,5 @@
 using HotelBookingSystem.RoomManagementService.Api.Extensions;
 using HotelBookingSystem.RoomManagementService.Application;
-using HotelBookingSystem.RoomManagementService.Application.Queries.GetRoomTypes;
 using HotelBookingSystem.RoomManagementService.Infrastructure;
 using HotelBookingSystem.RoomManagementService.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -32,8 +31,8 @@ try
         options.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
         {
             Version = "v1",
-            Title = "Goal Service API",
-            Description = "An ASP.NET Core Web API for managing Goals and their Progress"
+            Title = "Room Management Service API",
+            Description = "An ASP.NET Core Web API for managing Rooms and their Availability"
         });
     });
 
