@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
@@ -105,6 +106,19 @@ namespace Microsoft.Extensions.Hosting
 
             return builder;
         }
+
+        public static IServiceCollection AddDatabaseHealthCheck(this IServiceCollection services, IConfiguration configuration, string connectionName = "bookingdb")
+        {
+            var connectionString = configuration.GetConnectionString(connectionName);
+            if (!string.IsNullOrEmpty(connectionString))
+            {
+                services.AddHealthChecks()
+                    .AddNpgSql(connectionString, name: $"postgresql-{connectionName}", tags: ["ready", "db"]);
+            }
+            return services;
+        }
+
+
 
         public static WebApplication MapDefaultEndpoints(this WebApplication app)
         {

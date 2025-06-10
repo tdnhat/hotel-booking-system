@@ -10,4 +10,25 @@
     <ProjectReference Include="..\HotelBookingSystem.BookingService.Application\HotelBookingSystem.BookingService.Application.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- MassTransit Core -->
+    <PackageReference Include="MassTransit" Version="8.4.1" />
+    <!-- Entity Framework Integration for Saga Persistence -->
+    <PackageReference Include="MassTransit.EntityFrameworkCore" Version="8.4.1" />
+    <!-- RabbitMQ Transport -->
+    <PackageReference Include="MassTransit.RabbitMQ" Version="8.4.1" />
+    <!-- SignalR for real-time communication -->
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Core" Version="1.2.0" />
+    <!-- Entity Framework Core -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.5" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.5">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <!-- PostgreSQL Provider -->
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
+    <!-- Logging -->
+    <PackageReference Include="Serilog.Extensions.Logging" Version="9.0.2" />
+  </ItemGroup>
+
 </Project>
