@@ -61,7 +61,9 @@ namespace HotelBookingSystem.BookingService.Infrastructure.Data.Configurations
 
             // Concurrency token for optimistic locking
             builder.Property(bs => bs.Version)
-                .IsRowVersion();
+                .IsConcurrencyToken()
+                .IsRequired(false)
+                .HasDefaultValue(new byte[0]);
 
             // Indexes for performance
             builder.HasIndex(bs => bs.BookingId)

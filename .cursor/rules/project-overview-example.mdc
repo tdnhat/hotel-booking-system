@@ -1,0 +1,383 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Hotel Booking System Project Overview
+
+## Project Structure
+The project follows Clean Architecture principles with clear separation of concerns across microservices:
+
+```
+HotelBookingSystem/
+├── BookingService/                     - Booking lifecycle management
+│   ├── HotelBookingSystem.BookingService.Domain/        - Core booking domain models
+│   ├── HotelBookingSystem.BookingService.Application/   - Booking use cases and CQRS
+│   ├── HotelBookingSystem.BookingService.Infrastructure/ - Data access, MassTransit sagas
+│   └── HotelBookingSystem.BookingService.Api/          - REST API endpoints
+├── RoomManagementService/              - Room inventory and pricing
+│   ├── HotelBookingSystem.RoomManagementService.Domain/        - Room domain models
+│   ├── HotelBookingSystem.RoomManagementService.Application/   - Room management CQRS
+│   ├── HotelBookingSystem.RoomManagementService.Infrastructure/ - Data persistence
+│   └── HotelBookingSystem.RoomManagementService.Api/          - Room management API
+├── HotelBookingSystem.AppHost/         - .NET Aspire orchestration
+└── HotelBookingSystem.ServiceDefaults/ - Shared configurations and extensions
+```
+
+## Key Patterns & Concepts
+
+1. **CQRS Pattern with MediatR**:
+   - Commands (CreateBookingCommand) and Queries (GetBookingStatusQuery) are separated
+   - MediatR is used for command/query dispatching
+   
+```7:25:src/BookingService/HotelBookingSystem.BookingService.Application/Commands/CreateBooking/CreateBookingCommand.cs
+public record CreateBookingCommand(
+    Guid RoomTypeId,
+    Guid GuestId,
+    DateTime CheckInDate,
+    DateTime CheckOutDate) : IRequest<Result<Guid>>;
+
+public class CreateBookingCommandHandler : IRequestHandler<CreateBookingCommand, Result<Guid>>
+{
+    private readonly IBookingRepository _bookingRepository;
+    private readonly IMessagePublisher _messagePublisher;
+
+    public CreateBookingCommandHandler(
+        IBookingRepository bookingRepository,
+        IMessagePublisher messagePublisher)
+    {
+        _bookingRepository = bookingRepository;
+        _messagePublisher = messagePublisher;
+    }
+
+    public async Task<Result<Guid>> Handle(CreateBookingCommand command, CancellationToken cancellationToken)
+```
+
+2. **Saga Pattern with MassTransit**:
+   - State machines orchestrate complex booking workflows
+   - Compensating actions for failed transactions
+   
+```10:45:src/BookingService/HotelBookingSystem.BookingService.Infrastructure/Sagas/BookingSagaStateMachine.cs
+public class BookingSagaStateMachine : MassTransitStateMachine<BookingState>
+{
+    public State Submitted { get; private set; }
+    public State RoomHoldRequested { get; private set; }
+    public State PaymentProcessing { get; private set; }
+    public State Confirmed { get; private set; }
+    public State Failed { get; private set; }
+
+    public Event<BookingRequested> BookingRequested { get; private set; }
+    public Event<RoomHeld> RoomHeld { get; private set; }
+    public Event<RoomHoldFailed> RoomHoldFailed { get; private set; }
+    public Event<PaymentSucceeded> PaymentSucceeded { get; private set; }
+    public Event<PaymentFailed> PaymentFailed { get; private set; }
+
+    public BookingSagaStateMachine()
+    {
+        InstanceState(x => x.CurrentState);
+
+        Event(() => BookingRequested, x => x.CorrelateById(context => context.Message.BookingId));
+        Event(() => RoomHeld, x => x.CorrelateById(context => context.Message.BookingId));
+        Event(() => RoomHoldFailed, x => x.CorrelateById(context => context.Message.BookingId));
+
+        Initially(
+            When(BookingRequested)
+                .Then(context =>
+                {
+                    context.Saga.BookingId = context.Message.BookingId;
+                    context.Saga.RoomTypeId = context.Message.RoomTypeId;
+                    context.Saga.GuestId = context.Message.GuestId;
+                })
+                .Publish(context => new HoldRoom(
+                    context.Saga.BookingId,
+                    context.Saga.RoomTypeId))
+                .TransitionTo(RoomHoldRequested));
+```
+
+3. **Domain-Driven Design**:
+   - Rich domain models with encapsulated business logic
+   - Value Objects for type safety and domain concepts:
+   
+```5:30:src/RoomManagementService/HotelBookingSystem.RoomManagementService.Domain/ValueObjects/Price.cs
+public class Price : ValueObject
+{
+    public decimal Amount { get; private set; }
+    public string Currency { get; private set; }
+
+    private Price(decimal amount, string currency)
+    {
+        Amount = amount;
+        Currency = currency;
+    }
+
+    public static Price Create(decimal amount, string currency = "USD")
+    {
+        if (amount < 0)
+            throw new DomainException("Price amount cannot be negative");
+        
+        if (string.IsNullOrWhiteSpace(currency))
+            throw new DomainException("Currency is required");
+
+        return new Price(amount, currency);
+    }
+
+    public static Price operator +(Price left, Price right)
+    {
+        if (left.Currency != right.Currency)
+            throw new DomainException("Cannot add prices with different currencies");
+            
+        return new Price(left.Amount + right.Amount, left.Currency);
+    }
+
+    protected override IEnumerable<object> GetEqualityComponents()
+```
+
+4. **Result Pattern**:
+   - Replaces exceptions for expected failures
+   - Provides consistent error handling across services
+   
+```5:45:src/RoomManagementService/HotelBookingSystem.RoomManagementService.Domain/Common/Result.cs
+public class Result<T>
+{
+    public bool IsSuccess { get; private set; }
+    public bool IsFailure => !IsSuccess;
+    public T Value { get; private set; }
+    public string Error { get; private set; }
+
+    private Result(bool isSuccess, T value, string error)
+    {
+        IsSuccess = isSuccess;
+        Value = value;
+        Error = error;
+    }
+
+    public static Result<T> Success(T value) => new(true, value, null);
+    public static Result<T> Failure(string error) => new(false, default(T), error);
+
+    public static implicit operator Result<T>(T value) => Success(value);
+    public static implicit operator Result<T>(string error) => Failure(error);
+
+    public TResult Match<TResult>(Func<T, TResult> onSuccess, Func<string, TResult> onFailure)
+    {
+        return IsSuccess ? onSuccess(Value) : onFailure(Error);
+    }
+}
+
+public class Result
+{
+    public bool IsSuccess { get; private set; }
+    public bool IsFailure => !IsSuccess;
+    public string Error { get; private set; }
+
+    private Result(bool isSuccess, string error)
+    {
+        IsSuccess = isSuccess;
+        Error = error;
+    }
+
+    public static Result Success() => new(true, null);
+    public static Result Failure(string error) => new(false, error);
+```
+
+5. **Domain Events**:
+   - Decouple domain logic from infrastructure concerns
+   - Enable eventual consistency across services
+   
+```8:25:src/BookingService/HotelBookingSystem.BookingService.Domain/Events/BookingConfirmedEvent.cs
+public record BookingConfirmedEvent(
+    Guid BookingId,
+    Guid RoomTypeId,
+    Guid GuestId,
+    DateTime CheckInDate,
+    DateTime CheckOutDate,
+    decimal TotalAmount,
+    DateTime ConfirmedAt) : IDomainEvent;
+
+public class BookingConfirmedEventHandler : INotificationHandler<BookingConfirmedEvent>
+{
+    private readonly ISignalRNotifier _signalRNotifier;
+    private readonly ILogger<BookingConfirmedEventHandler> _logger;
+
+    public BookingConfirmedEventHandler(
+        ISignalRNotifier signalRNotifier,
+        ILogger<BookingConfirmedEventHandler> logger)
+    {
+        _signalRNotifier = signalRNotifier;
+        _logger = logger;
+    }
+```
+
+6. **SignalR for Real-time Communication**:
+   - Push booking status updates to clients
+   - Notify guests of booking progress
+   
+```10:35:src/BookingService/HotelBookingSystem.BookingService.Infrastructure/SignalR/BookingStatusHub.cs
+public class BookingStatusHub : Hub<IBookingStatusClient>
+{
+    public async Task JoinBookingGroup(string bookingId)
+    {
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"booking-{bookingId}");
+    }
+
+    public async Task LeaveBookingGroup(string bookingId)
+    {
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"booking-{bookingId}");
+    }
+}
+
+public interface IBookingStatusClient
+{
+    Task BookingStatusUpdated(BookingStatusUpdate update);
+}
+
+public record BookingStatusUpdate(
+    Guid BookingId,
+    string Status,
+    string Message,
+    DateTime Timestamp);
+```
+
+## Technology Stack
+
+- **.NET 9** with ASP.NET Core
+- **PostgreSQL** databases (separate per service)
+- **Entity Framework Core** for data access
+- **MassTransit + RabbitMQ** for messaging and saga orchestration
+- **SignalR** for real-time updates
+- **.NET Aspire** for application orchestration
+- **MediatR** for CQRS implementation
+- **FluentValidation** for input validation
+
+## Database Architecture
+
+Each microservice maintains its own database:
+
+```mermaid
+erDiagram
+    %% BookingService Database
+    BOOKING {
+        uuid id PK
+        uuid room_type_id FK
+        uuid guest_id
+        datetime check_in_date
+        datetime check_out_date
+        decimal total_amount
+        string status
+        datetime created_at
+        datetime updated_at
+    }
+    
+    BOOKING_STATE {
+        uuid id PK
+        uuid booking_id FK
+        string current_state
+        text saga_data
+        datetime created_at
+        datetime updated_at
+    }
+    
+    %% RoomManagementService Database
+    ROOM_TYPE {
+        uuid id PK
+        string name
+        string description
+        decimal base_price
+        string currency
+        int capacity
+        boolean is_active
+        datetime created_at
+        datetime updated_at
+    }
+    
+    ROOM_AVAILABILITY {
+        uuid id PK
+        uuid room_type_id FK
+        date available_date
+        int available_rooms
+        decimal price_override
+        datetime created_at
+        datetime updated_at
+    }
+    
+    BOOKING ||--|| BOOKING_STATE : has
+    ROOM_TYPE ||--o{ ROOM_AVAILABILITY : has
+```
+
+## Service Communication Patterns
+
+### Synchronous Communication
+- HTTP REST APIs for direct queries
+- Used for immediate consistency requirements
+
+### Asynchronous Communication
+- Message-based using MassTransit/RabbitMQ
+- Domain events for eventual consistency
+- Saga orchestration for complex workflows
+
+```mermaid
+sequenceDiagram
+    participant Guest
+    participant BookingAPI
+    participant BookingSaga
+    participant RoomService
+    participant PaymentService
+    participant SignalR
+    
+    Guest->>BookingAPI: POST /bookings
+    BookingAPI->>BookingSaga: Publish BookingRequested
+    BookingSaga->>RoomService: Send HoldRoom
+    RoomService-->>BookingSaga: RoomHeld
+    BookingSaga->>PaymentService: Send ProcessPayment
+    PaymentService-->>BookingSaga: PaymentSucceeded
+    BookingSaga->>SignalR: Notify BookingConfirmed
+    SignalR-->>Guest: Real-time Status Update
+    BookingAPI-->>Guest: 201 Created
+```
+
+## .NET Aspire Integration
+
+The AppHost orchestrates all services and their dependencies:
+
+```csharp
+var builder = DistributedApplication.CreateBuilder(args);
+
+var postgres = builder.AddPostgres("postgres")
+                     .WithDataVolume();
+
+var rabbitmq = builder.AddRabbitMQ("messaging");
+
+var bookingDb = postgres.AddDatabase("bookingdb");
+var roomManagementDb = postgres.AddDatabase("roommanagementdb");
+
+var bookingService = builder.AddProject<Projects.HotelBookingSystem_BookingService_Api>("booking-service")
+                            .WithReference(bookingDb)
+                            .WithReference(rabbitmq);
+
+var roomManagementService = builder.AddProject<Projects.HotelBookingSystem_RoomManagementService_Api>("room-management-service")
+                                   .WithReference(roomManagementDb)
+                                   .WithReference(rabbitmq);
+
+builder.Build().Run();
+```
+
+## Current Development Priorities
+
+### High Priority (Production Readiness)
+1. **Result Pattern Implementation** - Consistent error handling
+2. **Domain Events** - Enable eventual consistency
+3. **Global Exception Handling** - Standardized error responses
+4. **Input Validation** - FluentValidation integration
+
+### Medium Priority (Maintainability)
+1. **Mapping Strategy** - AutoMapper integration
+2. **Structured Logging** - Comprehensive observability
+3. **API Improvements** - Standardized responses, versioning
+4. **Caching Strategy** - Performance optimization
+
+### Low Priority (Advanced Features)
+1. **Security Implementation** - Authentication, authorization
+2. **Health Checks** - Service monitoring
+3. **Testing Strategy** - Comprehensive test coverage
+
+
+4. **Performance Optimizations** - Scalability improvements

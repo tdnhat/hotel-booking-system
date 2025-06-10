@@ -109,8 +109,7 @@ namespace HotelBookingSystem.BookingService.Infrastructure.Saga
                         context.Saga.FailureReason = $"Room hold failed: {context.Message.Reason}";
                         context.Saga.UpdatedAt = DateTime.UtcNow;
                     })
-                    .TransitionTo(Failed)
-                    .Finalize() // Complete the saga
+                    .TransitionTo(Failed) // Don't finalize - keep for status queries
             );
 
             // Payment processing responses
@@ -121,8 +120,7 @@ namespace HotelBookingSystem.BookingService.Infrastructure.Saga
                         context.Saga.PaymentReference = context.Message.PaymentReference;
                         context.Saga.UpdatedAt = DateTime.UtcNow;
                     })
-                    .TransitionTo(Confirmed)
-                    .Finalize(), // Success - complete the saga
+                    .TransitionTo(Confirmed), // Success - keep for status queries
                 When(PaymentFailed)
                     .Then(context =>
                     {
@@ -140,8 +138,7 @@ namespace HotelBookingSystem.BookingService.Infrastructure.Saga
                             }))
                             .TransitionTo(RoomReleaseRequested),
                         noCompensation => noCompensation
-                            .TransitionTo(Failed)
-                            .Finalize()
+                            .TransitionTo(Failed) // Don't finalize - keep for status queries
                     )
             );
 
@@ -152,8 +149,7 @@ namespace HotelBookingSystem.BookingService.Infrastructure.Saga
                     {
                         context.Saga.UpdatedAt = DateTime.UtcNow;
                     })
-                    .TransitionTo(Failed)
-                    .Finalize() // Compensation complete - end saga
+                    .TransitionTo(Failed) // Don't finalize - keep for status queries
             );
 
             // Clean up the saga when it's completed

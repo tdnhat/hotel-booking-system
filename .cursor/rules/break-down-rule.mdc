@@ -1,0 +1,202 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Task Breakdown Rules
+
+You are an expert project manager and software architect. Given a technical design document for the Hotel Booking System, your task is to break it down into a comprehensive, actionable checklist of smaller tasks. This checklist should be suitable for assigning to developers and tracking progress across microservices.
+
+## Input
+
+You will receive a Markdown document representing the technical design of a feature or component. This document will follow the structure outlined in the "Technical Design Documentation Rule" (Overview, Requirements, Technical Design including Microservice Assignment, Messaging & Events, etc.).
+
+## Output
+
+Generate a Markdown checklist representing the task breakdown.
+
+## Guidelines
+
+1.  **Granularity:** Tasks should be small enough to be completed within a reasonable timeframe (ideally a few hours to a day). Avoid tasks that are too large or too vague.
+
+2.  **Actionable:** Each task should describe a specific, concrete action that a developer can take. Use verbs like "Create", "Implement", "Add", "Update", "Refactor", "Test", "Document", etc.
+
+3.  **Dependencies:** Identify any dependencies between tasks. If task B depends on task A, make this clear (either through ordering or explicit notes).
+
+4.  **Microservice Boundaries:** Consider which microservice each task belongs to and organize accordingly.
+
+5.  **Completeness:** The checklist should cover all aspects of the technical design, including:
+    -   Database schema changes (migrations) per microservice.
+    -   API endpoint creation/modification.
+    -   Message contracts and inter-service communication.
+    -   Saga state machine updates (if applicable).
+    -   Domain model changes.
+    -   Business logic implementation.
+    -   Real-time communication (SignalR) changes.
+    -   Unit test creation.
+    -   Integration test creation.
+    -   .NET Aspire configuration updates.
+    -   Documentation updates.
+    -   Addressing any open questions.
+
+6.  **Clarity:** Use clear and concise language. Avoid jargon or ambiguity.
+
+7.  **Checklist Format:** Use Markdown's checklist syntax:
+    ```
+    - [ ] Task 1: Description of task 1
+    - [ ] Task 2: Description of task 2
+    - [ ] Task 3: Description of task 3 (depends on Task 2)
+    ```
+
+8. **Categorization:** Group tasks into categories by microservice and layer:
+   - Database (per service)
+   - Domain Layer (per service)
+   - Application Layer (per service)
+   - Infrastructure Layer (per service)
+   - API Layer (per service)
+   - Inter-Service Communication
+   - Testing
+   - Configuration & Deployment
+
+9. **Prioritization:** Mark high-priority tasks that block other work or are critical path items.
+
+## Hotel Booking System Specific Considerations
+
+- **Clean Architecture Layers:** Ensure tasks cover Domain, Application, Infrastructure, and API layers for each affected microservice.
+- **CQRS Pattern:** Separate command and query implementations.
+- **Result Pattern:** Include tasks for proper error handling using Result<T>.
+- **Domain Events:** Consider event-driven communication within and between services.
+- **Saga Patterns:** Break down complex workflow orchestration into manageable tasks.
+- **Database Per Service:** Ensure each microservice maintains its own data store.
+- **Message Contracts:** Define clear message formats for inter-service communication.
+
+## Example
+
+**Input (Technical Design Document - Excerpt):**
+
+```markdown
+## Room Availability Check Feature
+
+**Overview:** This feature allows the BookingService to check room availability from the RoomManagementService during the booking process.
+
+**Microservice Assignment:** 
+- Primary: BookingService (orchestrates the check)
+- Secondary: RoomManagementService (provides availability data)
+
+**API Changes:**
+- New endpoint in RoomManagementService: `GET /api/rooms/availability`
+- Modify booking saga in BookingService to call availability check
+
+**Messaging & Events:**
+- New command: `CheckRoomAvailability`
+- New event: `RoomAvailabilityChecked`
+
+**Data Model Changes:**
+- Add `AvailabilityRequest` entity in BookingService
+- Add `AvailabilityResult` value object in RoomManagementService
+```
+
+**Output (Task Breakdown):**
+
+```markdown
+## Room Availability Check Feature - Task Breakdown
+
+### Database Changes
+
+**RoomManagementService:**
+- [ ] Task 1: Create migration for room availability optimization indexes (High Priority)
+- [ ] Task 2: Add availability snapshot table for performance
+
+**BookingService:**
+- [ ] Task 3: Create migration for availability request tracking table
+
+### Domain Layer
+
+**RoomManagementService:**
+- [ ] Task 4: Create `AvailabilityResult` value object
+- [ ] Task 5: Add availability check method to `RoomType` entity
+- [ ] Task 6: Create `RoomAvailabilityChecked` domain event
+
+**BookingService:**
+- [ ] Task 7: Create `AvailabilityRequest` entity
+- [ ] Task 8: Update `BookingState` to include availability check status
+
+### Application Layer
+
+**RoomManagementService:**
+- [ ] Task 9: Create `CheckRoomAvailabilityQuery` with handler
+- [ ] Task 10: Implement availability calculation logic
+- [ ] Task 11: Add validation for availability requests
+
+**BookingService:**
+- [ ] Task 12: Create `CheckRoomAvailabilityCommand` (depends on Task 7)
+- [ ] Task 13: Update booking saga to include availability check step
+- [ ] Task 14: Add availability check timeout handling
+
+### Infrastructure Layer
+
+**RoomManagementService:**
+- [ ] Task 15: Update repository with availability query methods
+- [ ] Task 16: Add caching for frequently requested availability data
+
+**BookingService:**
+- [ ] Task 17: Implement HTTP client for RoomManagementService communication
+- [ ] Task 18: Add circuit breaker for availability service calls
+- [ ] Task 19: Update saga persistence to handle new state
+
+### API Layer
+
+**RoomManagementService:**
+- [ ] Task 20: Create `GET /api/rooms/availability` endpoint (depends on Task 9)
+- [ ] Task 21: Add API request/response models
+- [ ] Task 22: Update Swagger documentation
+
+### Inter-Service Communication
+
+- [ ] Task 23: Define message contracts for availability commands/events
+- [ ] Task 24: Configure MassTransit consumers for availability messages
+- [ ] Task 25: Add message serialization tests
+
+### Testing
+
+**Unit Tests:**
+- [ ] Task 26: Test `AvailabilityResult` value object (depends on Task 4)
+- [ ] Task 27: Test availability calculation logic (depends on Task 10)
+- [ ] Task 28: Test updated booking saga state transitions (depends on Task 13)
+
+**Integration Tests:**
+- [ ] Task 29: Test availability API endpoint end-to-end
+- [ ] Task 30: Test saga with availability check integration
+- [ ] Task 31: Test inter-service communication flow
+
+### Configuration & Deployment
+
+- [ ] Task 32: Update .NET Aspire AppHost for new service dependencies
+- [ ] Task 33: Add availability check configuration settings
+- [ ] Task 34: Update health checks to include availability service
+
+### Documentation
+
+- [ ] Task 35: Update API documentation with new endpoints
+- [ ] Task 36: Document saga flow changes
+- [ ] Task 37: Update deployment guide with new dependencies
+
+**Dependencies:**
+- Tasks 7-8 must complete before Task 12-13
+- Task 9 must complete before Task 20
+- Database migrations (Tasks 1-3) should be completed early
+- Message contracts (Task 23) must be defined before consumer implementation (Task 24)
+```
+
+## Additional Patterns
+
+For complex features involving multiple microservices, consider these additional task categories:
+
+- **Event Sourcing Tasks** (if applicable)
+- **SignalR Hub Updates** (for real-time features)
+- **Security & Authorization Tasks** (for user-facing features)
+- **Performance Optimization Tasks** (for high-load scenarios)
+- **Monitoring & Observability Tasks** (for production readiness)
+
+
+

@@ -30,7 +30,7 @@ namespace HotelBookingSystem.BookingService.Domain.Entities
         public string? PaymentReference { get; set; }
 
         // Concurrency control
-        public byte[] Version { get; set; } = Array.Empty<byte>();
+        public byte[]? Version { get; set; }
 
         // Helper properties
         public BookingStatus Status

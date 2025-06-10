@@ -8,6 +8,7 @@ using HotelBookingSystem.BookingService.Application.Interfaces;
 using MassTransit;
 using HotelBookingSystem.BookingService.Infrastructure.Saga;
 using HotelBookingSystem.BookingService.Domain.Entities;
+using HotelBookingSystem.BookingService.Infrastructure.Consumers;
 
 namespace HotelBookingSystem.BookingService.Infrastructure
 {
@@ -36,15 +37,29 @@ namespace HotelBookingSystem.BookingService.Infrastructure
                         r.ExistingDbContext<BookingDbContext>(); // Use the same DbContext for the repository
                     });
 
-                // Configure RabbitMQ
+                config.AddConsumer<HoldRoomConsumer>();
+                config.AddConsumer<ProcessPaymentConsumer>();
+                config.AddConsumer<ReleaseRoomConsumer>();
+
+                // Configure RabbitMQ with Aspire connection string
                 config.UsingRabbitMq((context, cfg) =>
                 {
-                    var rabbitConfig = configuration.GetSection("RabbitMQ");
-                    cfg.Host(rabbitConfig["Host"], h =>
+                    // Use Aspire connection string if available, otherwise fallback to configuration
+                    var connectionString = configuration.GetConnectionString("messaging");
+                    if (!string.IsNullOrEmpty(connectionString))
                     {
-                        h.Username(rabbitConfig["Username"]);
-                        h.Password(rabbitConfig["Password"]);
-                    });
+                        cfg.Host(connectionString);
+                    }
+                    else
+                    {
+                        // Fallback to traditional configuration for development without Aspire
+                        var rabbitConfig = configuration.GetSection("RabbitMQ");
+                        cfg.Host(rabbitConfig["Host"], h =>
+                        {
+                            h.Username(rabbitConfig["Username"]);
+                            h.Password(rabbitConfig["Password"]);
+                        });
+                    }
 
                     // Configure endpoints for our saga
                     cfg.ConfigureEndpoints(context);

@@ -17,6 +17,8 @@
     <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.9.0" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.9.0" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.9.0" />
+    <PackageReference Include="AspNetCore.HealthChecks.NpgSql" Version="8.1.0" />
+    <PackageReference Include="AspNetCore.HealthChecks.RabbitMQ" Version="8.1.0" />
   </ItemGroup>
 
 </Project>

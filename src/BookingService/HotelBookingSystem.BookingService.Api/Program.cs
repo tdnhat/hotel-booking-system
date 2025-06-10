@@ -1,3 +1,6 @@
+using HotelBookingSystem.BookingService.Api.Endpoints;
+using HotelBookingSystem.BookingService.Api.Extensions;
+using HotelBookingSystem.BookingService.Application;
 using HotelBookingSystem.BookingService.Infrastructure;
 using HotelBookingSystem.BookingService.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -24,7 +27,6 @@ try
     builder.AddServiceDefaults();
 
     // Add services to the container
-    builder.Services.AddControllers();
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(options =>
     {
@@ -37,7 +39,12 @@ try
     });
 
     // Add Infrastructure services (includes DbContext)
-    builder.Services.AddInfrastructure(builder.Configuration);
+    builder.Services
+        .AddApplication()
+        .AddInfrastructure(builder.Configuration);
+
+    // Add health checks for dependencies
+    builder.Services.AddDatabaseHealthCheck(builder.Configuration, "bookingdb");
 
     var app = builder.Build();
 
@@ -49,8 +56,11 @@ try
     }
 
     app.UseHttpsRedirection();
-    app.UseAuthorization();
-    app.MapControllers();
+
+    app.MapBookingEndpoints();
+
+    // Map default endpoints (includes health checks)
+    app.MapDefaultEndpoints();
 
     // Auto-migrate database in development
     if (app.Environment.IsDevelopment())
@@ -62,7 +72,7 @@ try
 
     Log.Information("Booking Service started successfully");
 
-    app.Run();
+    await app.RunAsync();
 }
 catch (Exception ex)
 {
