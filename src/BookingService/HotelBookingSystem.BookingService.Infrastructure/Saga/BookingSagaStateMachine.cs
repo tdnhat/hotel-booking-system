@@ -2,6 +2,7 @@ using HotelBookingSystem.BookingService.Domain.Entities;
 using HotelBookingSystem.BookingService.Domain.Messages.Commands;
 using HotelBookingSystem.BookingService.Domain.Messages.Events;
 using MassTransit;
+using Microsoft.Extensions.Logging;
 
 namespace HotelBookingSystem.BookingService.Infrastructure.Saga
 {
@@ -11,6 +12,7 @@ namespace HotelBookingSystem.BookingService.Infrastructure.Saga
     /// </summary>
     public class BookingSagaStateMachine : MassTransitStateMachine<BookingState>
     {
+        private readonly ILogger<BookingSagaStateMachine> _logger;
         // State declarations
         public State Submitted { get; private set; } = null!;
         public State RoomHoldRequested { get; private set; } = null!;
@@ -28,8 +30,10 @@ namespace HotelBookingSystem.BookingService.Infrastructure.Saga
         public Event<PaymentFailed> PaymentFailed { get; private set; } = null!;
         public Event<RoomReleased> RoomReleased { get; private set; } = null!;
 
-        public BookingSagaStateMachine()
+        public BookingSagaStateMachine(ILogger<BookingSagaStateMachine> logger)
         {
+            _logger = logger;
+            
             // Configure the state machine - specify which property tracks the current state
             InstanceState(x => x.CurrentState);
 
@@ -70,6 +74,14 @@ namespace HotelBookingSystem.BookingService.Infrastructure.Saga
                         context.Saga.NumberOfGuests = message.NumberOfGuests;
                         context.Saga.CreatedAt = DateTime.UtcNow;
                         context.Saga.UpdatedAt = DateTime.UtcNow;
+
+                        _logger.LogInformation(
+                            "Booking saga initiated for BookingId: {BookingId}, CorrelationId: {CorrelationId}, " +
+                            "Hotel: {HotelId}, RoomType: {RoomTypeId}, Guest: {GuestEmail}, " +
+                            "CheckIn: {CheckInDate}, CheckOut: {CheckOutDate}, TotalPrice: {TotalPrice}",
+                            message.BookingId, context.Saga.CorrelationId, message.HotelId, 
+                            message.RoomTypeId, message.GuestEmail, message.CheckInDate, 
+                            message.CheckOutDate, message.TotalPrice);
                     })
                     // Send command to hold the room
                     .PublishAsync(context => context.Init<HoldRoom>(new
@@ -82,6 +94,12 @@ namespace HotelBookingSystem.BookingService.Infrastructure.Saga
                         NumberOfGuests = context.Saga.NumberOfGuests,
                         HoldDuration = TimeSpan.FromMinutes(10)
                     }))
+                    .Then(context =>
+                    {
+                        _logger.LogInformation(
+                            "HoldRoom command published for BookingId: {BookingId}, RoomType: {RoomTypeId}, Hotel: {HotelId}",
+                            context.Saga.BookingId, context.Saga.RoomTypeId, context.Saga.HotelId);
+                    })
                     .TransitionTo(RoomHoldRequested) // Wait for room hold response
             );
 
@@ -92,6 +110,12 @@ namespace HotelBookingSystem.BookingService.Infrastructure.Saga
                     {
                         context.Saga.RoomHoldReference = context.Message.RoomHoldReference;
                         context.Saga.UpdatedAt = DateTime.UtcNow;
+
+                        _logger.LogInformation(
+                            "Room hold successful for BookingId: {BookingId}, HoldReference: {RoomHoldReference}, " +
+                            "RoomNumber: {RoomNumber}, HeldUntil: {HeldUntil}",
+                            context.Saga.BookingId, context.Message.RoomHoldReference,
+                            context.Message.RoomNumber, context.Message.HeldUntil);
                     })
                     // Send command to process payment
                     .PublishAsync(context => context.Init<ProcessPayment>(new
@@ -102,12 +126,22 @@ namespace HotelBookingSystem.BookingService.Infrastructure.Saga
                         Currency = "USD",
                         PaymentMethod = "CreditCard"
                     }))
+                    .Then(context =>
+                    {
+                        _logger.LogInformation(
+                            "ProcessPayment command published for BookingId: {BookingId}, Amount: {Amount}, Guest: {GuestEmail}",
+                            context.Saga.BookingId, context.Saga.TotalPrice, context.Saga.GuestEmail);
+                    })
                     .TransitionTo(PaymentProcessing),
                 When(RoomHoldFailed)
                     .Then(context =>
                     {
                         context.Saga.FailureReason = $"Room hold failed: {context.Message.Reason}";
                         context.Saga.UpdatedAt = DateTime.UtcNow;
+
+                        _logger.LogWarning(
+                            "Room hold failed for BookingId: {BookingId}, Reason: {Reason}, Hotel: {HotelId}, RoomType: {RoomTypeId}",
+                            context.Saga.BookingId, context.Message.Reason, context.Saga.HotelId, context.Saga.RoomTypeId);
                     })
                     .TransitionTo(Failed) // Don't finalize - keep for status queries
             );
@@ -119,6 +153,12 @@ namespace HotelBookingSystem.BookingService.Infrastructure.Saga
                     {
                         context.Saga.PaymentReference = context.Message.PaymentReference;
                         context.Saga.UpdatedAt = DateTime.UtcNow;
+
+                        _logger.LogInformation(
+                            "Payment successful for BookingId: {BookingId}, PaymentReference: {PaymentReference}, " +
+                            "Amount: {Amount}, Guest: {GuestEmail}",
+                            context.Saga.BookingId, context.Message.PaymentReference,
+                            context.Saga.TotalPrice, context.Saga.GuestEmail);
                     })
                     .TransitionTo(Confirmed), // Success - keep for status queries
                 When(PaymentFailed)
@@ -126,10 +166,20 @@ namespace HotelBookingSystem.BookingService.Infrastructure.Saga
                     {
                         context.Saga.FailureReason = $"Payment failed: {context.Message.Reason}";
                         context.Saga.UpdatedAt = DateTime.UtcNow;
+
+                        _logger.LogWarning(
+                            "Payment failed for BookingId: {BookingId}, Reason: {Reason}, Amount: {Amount}, Guest: {GuestEmail}",
+                            context.Saga.BookingId, context.Message.Reason, context.Saga.TotalPrice, context.Saga.GuestEmail);
                     })
                     // Compensate by releasing the room if we have a hold reference
                     .IfElse(context => !string.IsNullOrEmpty(context.Saga.RoomHoldReference),
                         compensate => compensate
+                            .Then(context =>
+                            {
+                                _logger.LogInformation(
+                                    "Initiating compensation - releasing room hold for BookingId: {BookingId}, HoldReference: {RoomHoldReference}",
+                                    context.Saga.BookingId, context.Saga.RoomHoldReference);
+                            })
                             .PublishAsync(context => context.Init<ReleaseRoom>(new
                             {
                                 BookingId = context.Saga.BookingId,
@@ -138,6 +188,12 @@ namespace HotelBookingSystem.BookingService.Infrastructure.Saga
                             }))
                             .TransitionTo(RoomReleaseRequested),
                         noCompensation => noCompensation
+                            .Then(context =>
+                            {
+                                _logger.LogInformation(
+                                    "No compensation needed for BookingId: {BookingId} - no room hold reference found",
+                                    context.Saga.BookingId);
+                            })
                             .TransitionTo(Failed) // Don't finalize - keep for status queries
                     )
             );
@@ -148,12 +204,43 @@ namespace HotelBookingSystem.BookingService.Infrastructure.Saga
                     .Then(context =>
                     {
                         context.Saga.UpdatedAt = DateTime.UtcNow;
+
+                        _logger.LogInformation(
+                            "Room release compensation completed for BookingId: {BookingId}, HoldReference: {RoomHoldReference}",
+                            context.Saga.BookingId, context.Saga.RoomHoldReference);
                     })
                     .TransitionTo(Failed) // Don't finalize - keep for status queries
             );
 
+            // Add state transition logging for all states
+            DuringAny(
+                When(BookingRequested)
+                    .Then(context => LogStateTransition(context, "Initial", "Submitted")),
+                When(RoomHeld)
+                    .Then(context => LogStateTransition(context, "RoomHoldRequested", "PaymentProcessing")),
+                When(RoomHoldFailed)
+                    .Then(context => LogStateTransition(context, "RoomHoldRequested", "Failed")),
+                When(PaymentSucceeded)
+                    .Then(context => LogStateTransition(context, "PaymentProcessing", "Confirmed")),
+                When(PaymentFailed)
+                    .Then(context => LogStateTransition(context, "PaymentProcessing", "RoomReleaseRequested/Failed")),
+                When(RoomReleased)
+                    .Then(context => LogStateTransition(context, "RoomReleaseRequested", "Failed"))
+            );
+
             // Clean up the saga when it's completed
             SetCompletedWhenFinalized();
+        }
+
+        private void LogStateTransition(BehaviorContext<BookingState> context, string fromState, string toState)
+        {
+            var saga = context.Saga;
+            var duration = DateTime.UtcNow - saga.CreatedAt;
+            
+            _logger.LogInformation(
+                "Saga state transition for BookingId: {BookingId} - {FromState} → {ToState}, " +
+                "Duration: {Duration}ms, CorrelationId: {CorrelationId}",
+                saga.BookingId, fromState, toState, duration.TotalMilliseconds, saga.CorrelationId);
         }
     }
 }
