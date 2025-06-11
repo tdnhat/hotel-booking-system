@@ -18,6 +18,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\BookingService\HotelBookingSystem.BookingService.Api\HotelBookingSystem.BookingService.Api.csproj" />
+    <ProjectReference Include="..\InventoryService\src\HotelBookingSystem.InventoryService.Api\HotelBookingSystem.InventoryService.Api.csproj" />
     <ProjectReference Include="..\RoomManagementService\HotelBookingSystem.RoomManagementService.Api\HotelBookingSystem.RoomManagementService.Api.csproj" />
     <ProjectReference Include="..\HotelBookingSystem.ServiceDefaults\HotelBookingSystem.ServiceDefaults.csproj" />
   </ItemGroup>
