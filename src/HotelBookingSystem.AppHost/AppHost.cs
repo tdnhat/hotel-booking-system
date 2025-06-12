@@ -1,34 +1,22 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
-// Infrastructure components
 var postgres = builder.AddPostgres("postgres")
-                     .WithDataVolume()
-                     .WithPgAdmin();
+    .WithImage("postgres")
+    .WithImageTag("16.3-alpine");
 
-var redis = builder.AddRedis("redis")
-                  .WithDataVolume();
+var rabbitmq = builder.AddRabbitMQ("rabbitmq")
+    .WithImage("rabbitmq")
+    .WithImageTag("3.13.3-management-alpine");
 
-var rabbitmq = builder.AddRabbitMQ("messaging")
-                     .WithDataVolume()
-                     .WithManagementPlugin();
-
-// Databases  
 var bookingDb = postgres.AddDatabase("bookingdb");
-var roomManagementDb = postgres.AddDatabase("roommanagementdb");
+var inventoryDb = postgres.AddDatabase("inventorydb");
 
-// API Services
-var bookingService = builder.AddProject<Projects.HotelBookingSystem_BookingService_Api>("booking-service")
-                            .WithReference(bookingDb)
-                            .WithReference(redis)
-                            .WithReference(rabbitmq);
+var bookingService = builder.AddProject<Projects.HotelBookingSystem_BookingService_Api>("bookingservice")
+    .WithReference(bookingDb)
+    .WithReference(rabbitmq);
 
-var roomManagementService = builder.AddProject<Projects.HotelBookingSystem_RoomManagementService_Api>("room-management-service")
-                                   .WithReference(roomManagementDb)
-                                   .WithReference(redis)
-                                   .WithReference(rabbitmq);
-
-// Enable service-to-service communication
-bookingService.WithReference(roomManagementService);
-roomManagementService.WithReference(bookingService);
+var inventoryService = builder.AddProject<Projects.HotelBookingSystem_InventoryService_Api>("inventoryservice")
+    .WithReference(inventoryDb)
+    .WithReference(rabbitmq);
 
 builder.Build().Run();
