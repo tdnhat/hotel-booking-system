@@ -1,41 +1,86 @@
-var builder = WebApplication.CreateBuilder(args);
+using HotelBookingSystem.InventoryService.Application;
+using HotelBookingSystem.InventoryService.Infrastructure;
+using HotelBookingSystem.InventoryService.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
+using Serilog;
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+// Configure Serilog
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console()
+    .CreateBootstrapLogger();
 
-var app = builder.Build();
-
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+try
 {
-    app.MapOpenApi();
+    Log.Information("Starting Inventory Service...");
+
+    var builder = WebApplication.CreateBuilder(args);
+
+    // Add Serilog
+    builder.Host.UseSerilog((context, configuration) =>
+    {
+        configuration.ReadFrom.Configuration(context.Configuration);
+    });
+
+    // Add service defaults (.NET Aspire)
+    builder.AddServiceDefaults();
+
+    // Add services to the container
+    builder.Services.AddEndpointsApiExplorer();
+    builder.Services.AddSwaggerGen(options =>
+    {
+        options.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
+        {
+            Version = "v1",
+            Title = "Inventory Service API",
+            Description = "An ASP.NET Core Web API for managing Hotel Room Inventory"
+        });
+    });
+
+    // Add application and infrastructure services
+    builder.Services
+        .AddApplication()
+        .AddInfrastructure(builder.Configuration);
+
+    // Add health checks for dependencies
+    builder.Services.AddDatabaseHealthCheck(builder.Configuration, "inventorydb");
+
+    var app = builder.Build();
+
+    // Configure the HTTP request pipeline
+    if (app.Environment.IsDevelopment())
+    {
+        app.UseSwagger();
+        app.UseSwaggerUI();
+    }
+
+    app.UseHttpsRedirection();
+
+    // Simple endpoint to check if service is running
+    app.MapGet("/", () => "InventoryService is running!")
+        .WithName("ServiceStatus")
+        .ExcludeFromDescription();
+
+    // Map default endpoints (includes health checks)
+    app.MapDefaultEndpoints();
+
+    // Auto-migrate database in development
+    if (app.Environment.IsDevelopment())
+    {
+        using var scope = app.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<InventoryDbContext>();
+        await context.Database.MigrateAsync();
+    }
+
+    Log.Information("Inventory Service started successfully");
+
+    await app.RunAsync();
 }
-
-app.UseHttpsRedirection();
-
-var summaries = new[]
+catch (Exception ex)
 {
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
-app.MapGet("/weatherforecast", () =>
+    Log.Fatal(ex, "Inventory Service failed to start");
+    throw;
+}
+finally
 {
-    var forecast = Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
-
-app.Run();
-
-internal record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+    Log.CloseAndFlush();
 }
