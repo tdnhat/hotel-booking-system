@@ -42,9 +42,21 @@ namespace HotelBookingSystem.RoomManagementService.Application.RoomTypes.Command
                 money,
                 bedConfiguration);
 
-            // Add features if provided
+            // Add features if provided, otherwise apply defaults based on room characteristics
             var roomType = hotel.GetRoomType(roomTypeId);
-            var features = RoomFeatures.Create(request.Features);
+            
+            RoomFeatures features;
+            if (request.Features.Any())
+            {
+                // Use manually provided features
+                features = RoomFeatures.Create(request.Features);
+            }
+            else
+            {
+                // Auto-assign features based on room characteristics
+                features = DetermineDefaultFeatures(request.Name, request.BasePrice, bedConfiguration);
+            }
+            
             roomType.SetFeatures(features);
 
             // Save changes
@@ -68,10 +80,25 @@ namespace HotelBookingSystem.RoomManagementService.Application.RoomTypes.Command
                     SecondaryBedCount = roomType.BedConfiguration.SecondaryBedCount,
                     Description = roomType.BedConfiguration.GetDescription()
                 },
-                Features = roomType.Features.Features.ToList()
+                Features = roomType.Features?.Features.ToList() ?? new List<string>()
             };
 
             return Result.Success(roomTypeDto);
+        }
+
+        private static RoomFeatures DetermineDefaultFeatures(string roomName, decimal basePrice, BedConfiguration bedConfiguration)
+        {
+            var roomNameLower = roomName.ToLowerInvariant();
+            
+            // Luxury features for expensive rooms or suites
+            if (basePrice >= 200 || roomNameLower.Contains("suite") || roomNameLower.Contains("luxury") || 
+                roomNameLower.Contains("premium") || roomNameLower.Contains("executive"))
+            {
+                return RoomFeatures.LuxuryFeatures();
+            }
+            
+            // Standard features for regular rooms
+            return RoomFeatures.StandardFeatures();
         }
     }
 }

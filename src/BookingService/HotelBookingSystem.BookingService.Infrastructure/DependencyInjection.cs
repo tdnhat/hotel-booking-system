@@ -45,7 +45,7 @@ namespace HotelBookingSystem.BookingService.Infrastructure
                 config.UsingRabbitMq((context, cfg) =>
                 {
                     // Use Aspire connection string if available, otherwise fallback to configuration
-                    var connectionString = configuration.GetConnectionString("messaging");
+                    var connectionString = configuration.GetConnectionString("rabbitmq");
                     if (!string.IsNullOrEmpty(connectionString))
                     {
                         cfg.Host(connectionString);

@@ -14,7 +14,7 @@ namespace HotelBookingSystem.RoomManagementService.Domain.Entities
         public int MaxOccupancy { get; private set; }
         public Money BasePrice { get; private set; }
         public BedConfiguration BedConfiguration { get; private set; }
-        public RoomFeatures Features { get; private set; }
+        public RoomFeatures Features { get; private set; } = RoomFeatures.Empty();
         public RoomTypeStatus Status { get; private set; }
         public DateTime CreatedAt { get; private set; }
         public DateTime? UpdatedAt { get; private set; }

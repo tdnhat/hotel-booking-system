@@ -88,7 +88,7 @@ namespace HotelBookingSystem.RoomManagementService.Application.Hotels.Commands.C
                         SecondaryBedCount = rt.BedConfiguration.SecondaryBedCount,
                         Description = rt.BedConfiguration.GetDescription()
                     },
-                    Features = rt.Features.Features.ToList()
+                    Features = rt.Features?.Features.ToList() ?? new List<string>()
                 }).ToList()
             };
         }

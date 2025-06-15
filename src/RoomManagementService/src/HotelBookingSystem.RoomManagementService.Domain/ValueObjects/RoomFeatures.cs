@@ -6,7 +6,7 @@ namespace HotelBookingSystem.RoomManagementService.Domain.ValueObjects
     {
         private readonly HashSet<string> _features;
 
-        public IReadOnlyCollection<string> Features => _features.ToList().AsReadOnly();
+        public IReadOnlyCollection<string> Features => _features;
 
         private RoomFeatures()
         {

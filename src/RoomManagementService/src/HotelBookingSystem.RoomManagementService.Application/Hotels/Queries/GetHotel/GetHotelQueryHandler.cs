@@ -47,22 +47,22 @@ namespace HotelBookingSystem.RoomManagementService.Application.Hotels.Queries.Ge
                 },
                 RoomTypes = hotel.RoomTypes.Select(rt => new RoomTypeDto
                 {
-                    Id = rt.Id.Value,
-                    Name = rt.Name,
-                    Description = rt.Description,
+                    Id = rt.Id?.Value ?? Guid.Empty,
+                    Name = rt.Name ?? string.Empty,
+                    Description = rt.Description ?? string.Empty,
                     MaxOccupancy = rt.MaxOccupancy,
-                    BasePrice = rt.BasePrice.Amount,
-                    Currency = rt.BasePrice.Currency,
+                    BasePrice = rt.BasePrice?.Amount ?? 0,
+                    Currency = rt.BasePrice?.Currency ?? Domain.Enums.Currency.USD,
                     Status = rt.Status,
-                    BedConfiguration = new BedConfigurationDto
+                    BedConfiguration = rt.BedConfiguration != null ? new BedConfigurationDto
                     {
                         PrimaryBedType = rt.BedConfiguration.PrimaryBedType,
                         PrimaryBedCount = rt.BedConfiguration.PrimaryBedCount,
                         SecondaryBedType = rt.BedConfiguration.SecondaryBedType,
                         SecondaryBedCount = rt.BedConfiguration.SecondaryBedCount,
                         Description = rt.BedConfiguration.GetDescription()
-                    },
-                    Features = rt.Features.Features.ToList()
+                    } : new BedConfigurationDto(),
+                    Features = rt.Features?.Features?.ToList() ?? new List<string>()
                 }).ToList()
             };
 
