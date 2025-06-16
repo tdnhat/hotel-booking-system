@@ -1,11 +1,13 @@
-﻿namespace HotelBookingSystem.RoomManagementService.Domain.Common.BaseTypes
+﻿namespace HotelBookingSystem.Domain.Core.Common.BaseTypes
 {
     public abstract class Entity<TId> where TId : notnull
     {
         private readonly List<IDomainEvent> _domainEvents = new();
         public TId Id { get; protected set; }
         public IReadOnlyCollection<IDomainEvent> DomainEvents => _domainEvents.AsReadOnly();
+
         protected Entity() { }
+
         protected Entity(TId id)
         {
             Id = id;

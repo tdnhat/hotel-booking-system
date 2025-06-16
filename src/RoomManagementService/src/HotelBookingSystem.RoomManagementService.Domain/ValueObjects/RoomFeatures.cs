@@ -1,4 +1,4 @@
-﻿using HotelBookingSystem.RoomManagementService.Domain.Common.BaseTypes;
+﻿using HotelBookingSystem.Domain.Core.Common.BaseTypes;
 
 namespace HotelBookingSystem.RoomManagementService.Domain.ValueObjects
 {

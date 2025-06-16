@@ -1,0 +1,560 @@
+# Hotel Booking System - Microservice Architecture Rule
+
+## Overview
+
+This document defines the architectural patterns, conventions, and implementation standards for microservices in the Hotel Booking System based on the RoomManagementService and BookingService implementations.
+
+## Shared Projects
+
+To promote code reuse and consistency, the solution includes a `Shared` folder containing common libraries referenced by multiple microservices.
+
+### `HotelBookingSystem.Domain.Core`
+
+This project contains the fundamental building blocks for the domain layers of all microservices.
+- **Base Types**: `Entity<TId>`, `ValueObject`, `IDomainEvent`.
+- **Common Exceptions**: `DomainException`, `BusinessRuleViolationException`.
+- **Guards**: A static `Guard` class for validating arguments and business rules.
+
+### `HotelBookingSystem.Contracts`
+
+This project defines the data contracts (messages) for inter-service communication via the message bus (MassTransit/RabbitMQ).
+- **Commands**: E.g., `HoldRoom`, `ProcessPayment`. These are requests for a service to perform an action.
+- **Events**: E.g., `RoomHeld`, `PaymentSucceeded`. These are notifications that something has happened.
+All services that produce or consume messages from the bus should reference this project.
+
+## Architecture Patterns
+
+### Clean Architecture with DDD
+- **Domain-Driven Design** with rich domain models
+- **Clean Architecture** layers: Domain, Application, Infrastructure, API
+- **CQRS** pattern with MediatR for command/query separation
+- **Saga Pattern** for distributed transactions (using MassTransit)
+
+### Technology Stack
+- **.NET 9.0** as the runtime
+- **Entity Framework Core** with PostgreSQL
+- **MassTransit** with RabbitMQ for messaging
+- **MediatR** for in-process messaging
+- **FluentValidation** for request validation
+- **Serilog** for structured logging
+- **Swagger/OpenAPI** for API documentation
+- **.NET Aspire** for service defaults and orchestration
+
+## Project Structure
+
+### Service Folder Structure
+```
+{ServiceName}/
+├── src/
+│   ├── HotelBookingSystem.{ServiceName}.Api/
+│   ├── HotelBookingSystem.{ServiceName}.Application/
+│   ├── HotelBookingSystem.{ServiceName}.Domain/
+│   └── HotelBookingSystem.{ServiceName}.Infrastructure/
+```
+
+### Naming Conventions
+- **Services**: `{BusinessDomain}Service` (e.g., RoomManagementService, BookingService)
+- **Projects**: `HotelBookingSystem.{ServiceName}.{Layer}`
+- **Namespaces**: Follow project structure exactly
+
+## Layer Responsibilities
+
+### 1. Domain Layer (`*.Domain`)
+
+#### Structure:
+```
+Domain/
+├── Entities/          # Rich domain entities with business logic
+├── ValueObjects/      # Immutable value types (e.g., Address, Money)
+├── Enums/            # Domain enumerations
+├── Events/           # Domain events for intra-service use
+├── Messages/         # Internal messages (e.g., to start a saga)
+├── Repositories/     # Repository interfaces
+└── Exceptions/       # Domain-specific exceptions
+```
+
+#### Patterns:
+- **Rich Domain Models**: Entities contain business logic and invariants
+- **Value Objects**: Immutable objects for primitive obsession avoidance
+- **Domain Events**: For side effects and eventual consistency
+- **Strong Typing**: Use strongly-typed IDs (e.g., `HotelId`, `RoomTypeId`)
+
+#### Example Entity:
+```csharp
+public class Hotel : Entity<HotelId>
+{
+    private readonly List<RoomType> _roomTypes = new();
+    
+    public string Name { get; private set; }
+    public Address Address { get; private set; }
+    public HotelStatus Status { get; private set; }
+    
+    public IReadOnlyCollection<RoomType> RoomTypes => _roomTypes.AsReadOnly();
+    
+    private Hotel() { } // EF Core constructor
+    
+    public Hotel(HotelId id, string name, Address address, /* other params */)
+    {
+        Id = id;
+        Name = Guard.Against.NullOrWhiteSpace(name, nameof(name));
+        Address = Guard.Against.Null(address, nameof(address));
+        // ... validation and business rules
+        
+        RaiseDomainEvent(new HotelCreatedDomainEvent(Id, Name, Address.GetFullAddress()));    }
+}
+```
+
+### 2. Application Layer (`*.Application`)
+
+#### Structure:
+```
+Application/
+├── {FeatureName}/
+│   ├── Commands/
+│   │   └── {CommandName}/
+│   │       ├── {CommandName}Command.cs
+│   │       ├── {CommandName}CommandHandler.cs
+│   │       └── {CommandName}CommandValidator.cs
+│   └── Queries/
+│       └── {QueryName}/
+│           ├── {QueryName}Query.cs
+│           └── {QueryName}QueryHandler.cs
+├── DTOs/              # Data Transfer Objects
+├── Common/
+│   ├── Abstractions/ # Interfaces for external dependencies
+│   ├── Behaviors/    # MediatR pipeline behaviors
+│   ├── Models/       # Result types, common models
+│   └── Exceptions/   # Application exceptions
+└── DependencyInjection.cs
+```
+
+#### Patterns:
+- **CQRS**: Commands for writes, Queries for reads
+- **MediatR**: For in-process messaging
+- **Result Pattern**: For error handling without exceptions
+- **Pipeline Behaviors**: For cross-cutting concerns
+
+#### Example Command:
+```csharp
+public record CreateHotelCommand : IRequest<Result<HotelDto>>
+{
+    public string Name { get; init; } = string.Empty;
+    public string Description { get; init; } = string.Empty;
+    public StarRating StarRating { get; init; }
+    public CreateAddressDto Address { get; init; } = new();
+}
+
+public class CreateHotelCommandHandler : IRequestHandler<CreateHotelCommand, Result<HotelDto>>
+{
+    private readonly IHotelRepository _hotelRepository;
+    
+    public async Task<Result<HotelDto>> Handle(CreateHotelCommand request, CancellationToken cancellationToken)
+    {
+        // Validation, business logic, persistence
+        // Return Result.Success() or Result.Failure()
+    }
+}
+```
+
+#### Pipeline Behaviors:
+```csharp
+// Always include these behaviors
+cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
+cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(PerformanceBehavior<,>));
+```
+
+### 3. Infrastructure Layer (`*.Infrastructure`)
+
+#### Structure:
+```
+Infrastructure/
+├── Data/
+│   ├── {DbContext}.cs
+│   ├── I{DbContext}.cs
+│   └── Configurations/    # EF Core entity configurations
+├── Repositories/          # Repository implementations
+├── Services/             # External service implementations
+├── Consumers/            # MassTransit message consumers
+├── Saga/                 # Saga state machines (if needed)
+└── DependencyInjection.cs
+```
+
+#### Patterns:
+- **Repository Pattern**: For data access abstraction
+- **DbContext Interface**: For testing and loose coupling
+- **Entity Configurations**: Separate EF Core configurations
+- **MassTransit Integration**: For messaging infrastructure
+
+#### Example Repository:
+```csharp
+public class HotelRepository : IHotelRepository
+{
+    private readonly IRoomManagementDbContext _context;
+    
+    public async Task<Hotel?> GetByIdAsync(HotelId id, CancellationToken cancellationToken = default)
+    {
+        return await _context.Hotels
+            .Include(h => h.RoomTypes)
+            .FirstOrDefaultAsync(h => h.Id == id, cancellationToken);
+    }
+}
+```
+
+#### DbContext Pattern:
+```csharp
+public class RoomManagementDbContext : DbContext, IRoomManagementDbContext
+{
+    public DbSet<Hotel> Hotels { get; set; }
+    public DbSet<RoomType> RoomTypes { get; set; }
+    
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+        
+        // Apply configurations from assembly
+        modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
+        
+        // Add MassTransit inbox/outbox support
+        modelBuilder.AddInboxStateEntity();
+        modelBuilder.AddOutboxStateEntity();
+        modelBuilder.AddOutboxMessageEntity();
+    }
+}
+```
+
+### 4. API Layer (`*.Api`)
+
+#### Structure:
+```
+Api/
+├── Endpoints/           # Minimal API endpoints
+├── Extensions/          # Extension methods for API configuration
+├── Properties/
+│   └── launchSettings.json
+├── Program.cs
+├── appsettings.json
+├── appsettings.Development.json
+└── Dockerfile
+```
+
+#### Patterns:
+- **Minimal APIs**: Using endpoint groups and extensions
+- **Service Registration**: Layered DI registration
+- **Health Checks**: For service monitoring
+- **Swagger/OpenAPI**: For API documentation
+
+#### Example Endpoints:
+```csharp
+public static class HotelEndpoints
+{
+    public static void MapHotelEndpoints(this IEndpointRouteBuilder endpoints)
+    {
+        var group = endpoints.MapGroup("/hotels")
+            .WithTags("Hotel Management")
+            .WithOpenApi();
+
+        group.MapPost("/", CreateHotel)
+            .Produces<HotelDto>(StatusCodes.Status201Created)
+            .Produces<ValidationProblemDetails>(StatusCodes.Status400BadRequest)
+            .WithName("CreateHotel")
+            .WithSummary("Create a new hotel");
+    }
+    
+    private static async Task<IResult> CreateHotel(
+        CreateHotelCommand command,
+        ISender sender,
+        ILogger<CreateHotelCommand> logger,
+        CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(command, cancellationToken);
+        return result.IsSuccess 
+            ? Results.Created($"/hotels/{result.Value.Id}", result.Value)
+            : Results.BadRequest(new { Title = "Creation failed", Detail = result.Error });
+    }
+}
+```
+
+#### Program.cs Pattern:
+```csharp
+// Configure Serilog
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console()
+    .CreateBootstrapLogger();
+
+try
+{
+    var builder = WebApplication.CreateBuilder(args);
+    
+    // Add Serilog
+    builder.Host.UseSerilog((context, config) => 
+        config.ReadFrom.Configuration(context.Configuration));
+    
+    // Add service defaults (.NET Aspire)
+    builder.AddServiceDefaults();
+    
+    // Add services
+    builder.Services.AddEndpointsApiExplorer();
+    builder.Services.AddSwaggerGen(/* OpenAPI config */);
+    
+    // Add layers
+    builder.Services
+        .AddApplication()
+        .AddInfrastructure(builder.Configuration);
+        
+    // Add health checks
+    builder.Services.AddDatabaseHealthCheck(builder.Configuration, "connectionName");
+    
+    var app = builder.Build();
+    
+    // Configure pipeline
+    if (app.Environment.IsDevelopment())
+    {
+        app.UseSwagger();
+        app.UseSwaggerUI();
+    }
+    
+    app.UseHttpsRedirection();
+    app.Map{Feature}Endpoints();
+    app.MapDefaultEndpoints();
+    
+    // Auto-migrate in development
+    if (app.Environment.IsDevelopment())
+    {
+        using var scope = app.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<{DbContext}>();
+        await context.Database.MigrateAsync();
+    }
+    
+    await app.RunAsync();
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "{ServiceName} failed to start");
+    throw;
+}
+finally
+{
+    Log.CloseAndFlush();
+}
+```
+
+## Dependency Injection Patterns
+
+### Application Layer DI:
+```csharp
+public static IServiceCollection AddApplication(this IServiceCollection services)
+{
+    var assembly = Assembly.GetExecutingAssembly();
+    
+    // MediatR with behaviors
+    services.AddMediatR(cfg =>
+    {
+        cfg.RegisterServicesFromAssembly(assembly);
+        cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
+        cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+        cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(PerformanceBehavior<,>));
+    });
+    
+    // FluentValidation
+    services.AddValidatorsFromAssembly(assembly);
+    
+    return services;
+}
+```
+
+### Infrastructure Layer DI:
+```csharp
+public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
+{
+    // Database
+    services.AddDbContext<{ServiceName}DbContext>(options =>
+        options.UseNpgsql(configuration.GetConnectionString("{servicename}db")));
+    
+    services.AddScoped<I{ServiceName}DbContext>(provider =>
+        provider.GetRequiredService<{ServiceName}DbContext>());
+    
+    // Repositories
+    services.AddScoped<I{Entity}Repository, {Entity}Repository>();
+    
+    // Services
+    services.AddScoped<IDateTime, DateTimeService>();
+    
+    // MassTransit
+    services.AddMassTransit(config =>
+    {
+        // Add saga if needed
+        config.AddSagaStateMachine<{Saga}StateMachine, {Saga}State>(typeof({Saga}Definition))
+            .EntityFrameworkRepository(r =>
+            {
+                r.ConcurrencyMode = ConcurrencyMode.Optimistic;
+                r.ExistingDbContext<{ServiceName}DbContext>();
+            });
+        
+        // Add consumers
+        config.AddConsumer<{Feature}Consumer>();
+        
+        // Configure RabbitMQ
+        config.UsingRabbitMq((context, cfg) =>
+        {
+            var connectionString = configuration.GetConnectionString("rabbitmq");
+            if (!string.IsNullOrEmpty(connectionString))
+                cfg.Host(connectionString);
+            else
+                cfg.Host(/* fallback config */);
+            
+            cfg.ConfigureEndpoints(context);
+        });
+    });
+    
+    return services;
+}
+```
+
+## Project File Standards
+
+### API Project:
+```xml
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.6" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.6" />
+    <PackageReference Include="Serilog.AspNetCore" Version="9.0.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="9.0.1" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\HotelBookingSystem.ServiceDefaults\HotelBookingSystem.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\{ServiceName}.Application\{ServiceName}.Application.csproj" />
+    <ProjectReference Include="..\{ServiceName}.Infrastructure\{ServiceName}.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>
+```
+
+## Messaging Patterns
+
+### Inter-Service Commands:
+
+All message contracts for inter-service communication are defined in the Shared/HotelBookingSystem.Contracts project.
+
+```csharp
+// Example from HotelBookingSystem.Contracts.Commands
+public class HoldRoom
+{
+    public Guid BookingId { get; set; }
+    public Guid RoomTypeId { get; set; }
+    public Guid HotelId { get; set; }
+    // ...
+}
+```
+
+### Saga Pattern (for Distributed Transactions):
+```csharp
+public class BookingSagaStateMachine : MassTransitStateMachine<BookingState>
+{
+    public State RoomHoldRequested { get; private set; }
+    public State PaymentProcessing { get; private set; }
+    public State Confirmed { get; private set; }
+    public State Failed { get; private set; }
+    
+    public Event<BookingRequested> BookingRequested { get; private set; }
+    public Event<RoomHeld> RoomHeld { get; private set; }
+    public Event<PaymentSucceeded> PaymentSucceeded { get; private set; }
+}
+```
+
+## Error Handling
+
+### Result Pattern:
+```csharp
+public class Result<T>
+{
+    public bool IsSuccess { get; }
+    public bool IsFailure => !IsSuccess;
+    public T Value { get; }
+    public string Error { get; }
+    
+    public static Result<T> Success(T value) => new(true, value, string.Empty);
+    public static Result<T> Failure(string error) => new(false, default!, error);
+}
+```
+
+### Domain Guards:
+```csharp
+public static class Guard
+{
+    public static T Against.Null<T>(T input, string parameterName) where T : class
+    {
+        if (input is null)
+            throw new ArgumentNullException(parameterName);
+        return input;
+    }
+    
+    public static string Against.NullOrWhiteSpace(string input, string parameterName)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+            throw new ArgumentException("Cannot be null or whitespace", parameterName);
+        return input;
+    }
+}
+```
+
+## Configuration Standards
+
+### appsettings.json:
+```json
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "ConnectionStrings": {
+    "{servicename}db": "Server=localhost;Database={ServiceName}Db;Uid=user;Pwd=password;",
+    "rabbitmq": "amqp://guest:guest@localhost:5672/"
+  },
+  "Serilog": {
+    "Using": ["Serilog.Sinks.Console"],
+    "MinimumLevel": "Information",
+    "WriteTo": [
+      { "Name": "Console" }
+    ]
+  }
+}
+```
+
+## Testing Patterns (Guidelines)
+
+- **Unit Tests**: For domain logic and application handlers
+- **Integration Tests**: For infrastructure and API endpoints
+- **Architecture Tests**: To enforce architectural boundaries
+- **Test Containers**: For integration testing with real dependencies
+
+## Documentation Requirements
+
+- **API Documentation**: Swagger/OpenAPI with detailed descriptions
+- **Architecture Decision Records**: For significant design decisions
+- **Service Overview**: Markdown file explaining service responsibilities
+- **Database Schema**: Entity relationship documentation
+
+## Best Practices
+
+1. **Domain First**: Start with domain modeling before other layers
+2. **Immutable Value Objects**: Use for domain concepts without identity
+3. **Explicit Dependencies**: Use constructor injection exclusively
+4. **Async All The Way**: Use async/await for all I/O operations
+5. **Structured Logging**: Use Serilog with structured logging
+6. **Health Checks**: Implement for all external dependencies
+7. **Configuration**: Use strongly-typed configuration options
+8. **Error Handling**: Use Result pattern to avoid exceptions for business logic
+9. **Validation**: Use FluentValidation for complex validation rules
+10. **Testing**: Write tests for all business logic and critical paths
+
+This rule serves as the foundation for implementing consistent, maintainable microservices in the Hotel Booking System.

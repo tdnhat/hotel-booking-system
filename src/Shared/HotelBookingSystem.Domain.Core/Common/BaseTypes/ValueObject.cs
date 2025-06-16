@@ -1,8 +1,9 @@
-﻿namespace HotelBookingSystem.RoomManagementService.Domain.Common.BaseTypes
+﻿namespace HotelBookingSystem.Domain.Core.Common.BaseTypes
 {
     public abstract class ValueObject
     {
         protected abstract IEnumerable<object> GetAtomicValues();
+
         public override bool Equals(object? obj)
         {
             if (obj == null || obj.GetType() != GetType())

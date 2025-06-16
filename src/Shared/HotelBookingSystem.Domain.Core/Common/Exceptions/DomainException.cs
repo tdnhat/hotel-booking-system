@@ -1,4 +1,4 @@
-﻿namespace HotelBookingSystem.RoomManagementService.Domain.Common.Exceptions
+﻿namespace HotelBookingSystem.Domain.Core.Common.Exceptions
 {
     public abstract class DomainException : Exception
     {

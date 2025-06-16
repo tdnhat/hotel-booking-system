@@ -1,4 +1,4 @@
-﻿namespace HotelBookingSystem.RoomManagementService.Domain.Common.BaseTypes
+﻿namespace HotelBookingSystem.Domain.Core.Common.BaseTypes
 {
     public interface IDomainEvent
     {

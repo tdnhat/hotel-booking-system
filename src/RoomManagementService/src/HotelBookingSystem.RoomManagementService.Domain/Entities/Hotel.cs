@@ -1,4 +1,4 @@
-﻿using HotelBookingSystem.RoomManagementService.Domain.Common.BaseTypes;
+﻿using HotelBookingSystem.Domain.Core.Common.BaseTypes;
 using HotelBookingSystem.RoomManagementService.Domain.Common.Exceptions;
 using HotelBookingSystem.RoomManagementService.Domain.Common.Guards;
 using HotelBookingSystem.RoomManagementService.Domain.Enums;

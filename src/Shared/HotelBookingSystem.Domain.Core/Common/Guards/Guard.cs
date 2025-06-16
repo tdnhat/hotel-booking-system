@@ -1,4 +1,4 @@
-﻿namespace HotelBookingSystem.RoomManagementService.Domain.Common.Guards
+﻿namespace HotelBookingSystem.Domain.Core.Common.Guards
 {
     public static class Guard
     {
