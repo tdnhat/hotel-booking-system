@@ -1,6 +1,6 @@
 ﻿using HotelBookingSystem.Domain.Core.Common.BaseTypes;
-using HotelBookingSystem.RoomManagementService.Domain.Common.Exceptions;
-using HotelBookingSystem.RoomManagementService.Domain.Common.Guards;
+using HotelBookingSystem.Domain.Core.Common.Exceptions;
+using HotelBookingSystem.Domain.Core.Common.Guards;
 using HotelBookingSystem.RoomManagementService.Domain.Enums;
 using HotelBookingSystem.RoomManagementService.Domain.Events;
 using HotelBookingSystem.RoomManagementService.Domain.ValueObjects;

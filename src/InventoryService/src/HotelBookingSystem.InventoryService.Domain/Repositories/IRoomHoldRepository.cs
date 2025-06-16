@@ -10,6 +10,8 @@ public interface IRoomHoldRepository
     
     Task<RoomHold?> GetByBookingIdAsync(Guid bookingId, CancellationToken cancellationToken = default);
     
+    Task<RoomHold?> GetByHoldReferenceAsync(string holdReference, CancellationToken cancellationToken = default);
+    
     Task<IEnumerable<RoomHold>> GetActiveHoldsAsync(CancellationToken cancellationToken = default);
     
     Task<IEnumerable<RoomHold>> GetExpiredHoldsAsync(CancellationToken cancellationToken = default);

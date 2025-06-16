@@ -1,3 +1,4 @@
+using HotelBookingSystem.InventoryService.Api.Extensions;
 using HotelBookingSystem.InventoryService.Application;
 using HotelBookingSystem.InventoryService.Infrastructure;
 using HotelBookingSystem.InventoryService.Infrastructure.Data;
@@ -55,20 +56,25 @@ try
 
     app.UseHttpsRedirection();
 
-    // Simple endpoint to check if service is running
-    app.MapGet("/", () => "InventoryService is running!")
-        .WithName("ServiceStatus")
-        .ExcludeFromDescription();
+    app.MapInventoryEndpoints();
 
     // Map default endpoints (includes health checks)
     app.MapDefaultEndpoints();
 
-    // Auto-migrate database in development
+    // Auto-migrate database in development (only if database is available)
     if (app.Environment.IsDevelopment())
     {
-        using var scope = app.Services.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<InventoryDbContext>();
-        await context.Database.MigrateAsync();
+        try
+        {
+            using var scope = app.Services.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<InventoryDbContext>();
+            await context.Database.MigrateAsync();
+            Log.Information("Database migrations applied successfully");
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Could not apply database migrations. Database may not be available yet. Service will continue to start.");
+        }
     }
 
     Log.Information("Inventory Service started successfully");

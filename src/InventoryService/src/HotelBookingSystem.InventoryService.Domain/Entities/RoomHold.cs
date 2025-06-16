@@ -14,6 +14,7 @@ public class RoomHold : Entity<HoldId>
     public int RoomCount { get; private set; }
     public Money TotalAmount { get; private set; }
     public HoldStatus Status { get; private set; }
+    public string HoldReference { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime ExpiresAt { get; private set; }
     public DateTime? ConfirmedAt { get; private set; }
@@ -30,13 +31,17 @@ public class RoomHold : Entity<HoldId>
         DateRange dateRange,
         int roomCount,
         Money totalAmount,
-        TimeSpan holdDuration)
+        TimeSpan holdDuration,
+        string holdReference)
     {
         if (roomCount <= 0)
             throw new ArgumentException("Room count must be positive");
 
         if (holdDuration <= TimeSpan.Zero)
             throw new ArgumentException("Hold duration must be positive");
+
+        if (string.IsNullOrWhiteSpace(holdReference))
+            throw new ArgumentException("Hold reference cannot be empty");
 
         Id = id;
         BookingId = bookingId;
@@ -46,6 +51,7 @@ public class RoomHold : Entity<HoldId>
         RoomCount = roomCount;
         TotalAmount = totalAmount;
         Status = HoldStatus.Active;
+        HoldReference = holdReference;
         CreatedAt = DateTime.UtcNow;
         ExpiresAt = CreatedAt.Add(holdDuration);
 

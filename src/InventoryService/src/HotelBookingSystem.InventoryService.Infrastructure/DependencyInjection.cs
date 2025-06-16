@@ -1,6 +1,8 @@
-using HotelBookingSystem.InventoryService.Application.Interfaces;
+using HotelBookingSystem.InventoryService.Domain.Repositories;
+using HotelBookingSystem.InventoryService.Domain.Services;
 using HotelBookingSystem.InventoryService.Infrastructure.Data;
 using HotelBookingSystem.InventoryService.Infrastructure.Repositories;
+using HotelBookingSystem.InventoryService.Infrastructure.Services;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -15,9 +17,19 @@ namespace HotelBookingSystem.InventoryService.Infrastructure
             // Add Entity Framework
             services.AddDbContext<InventoryDbContext>(options => options.UseNpgsql(configuration.GetConnectionString("inventorydb")));
 
+            // Register DbContext interface
+            services.AddScoped<IInventoryDbContext>(provider =>
+                provider.GetRequiredService<InventoryDbContext>());
+
             // Add repositories
-            services.AddScoped<IRoomAvailabilityRepository, RoomAvailabilityRepository>();
+            services.AddScoped<IRoomInventoryRepository, RoomInventoryRepository>();
             services.AddScoped<IRoomHoldRepository, RoomHoldRepository>();
+
+            // Add domain services
+            services.AddScoped<IInventoryDomainService, InventoryDomainService>();
+
+            // Add external services
+            services.AddScoped<IDateTime, DateTimeService>();
 
             // Add MassTransit
             services.AddMassTransit(config =>
@@ -28,7 +40,7 @@ namespace HotelBookingSystem.InventoryService.Infrastructure
                 config.UsingRabbitMq((context, cfg) =>
                 {
                     // Use Aspire connection string if available, otherwise fallback to configuration
-                    var connectionString = configuration.GetConnectionString("messaging");
+                    var connectionString = configuration.GetConnectionString("rabbitmq");
                     if (!string.IsNullOrEmpty(connectionString))
                     {
                         cfg.Host(connectionString);
@@ -36,7 +48,12 @@ namespace HotelBookingSystem.InventoryService.Infrastructure
                     else
                     {
                         // Fallback to traditional configuration for development without Aspire
-                        cfg.Host(configuration.GetConnectionString("RabbitMQ"));
+                        var rabbitConfig = configuration.GetSection("RabbitMQ");
+                        cfg.Host(rabbitConfig["Host"], h =>
+                        {
+                            h.Username(rabbitConfig["Username"]);
+                            h.Password(rabbitConfig["Password"]);
+                        });
                     }
 
                     cfg.ConfigureEndpoints(context);
@@ -46,4 +63,17 @@ namespace HotelBookingSystem.InventoryService.Infrastructure
             return services;
         }
     }
-} 
+
+    // External service implementations
+    public interface IDateTime
+    {
+        DateTime UtcNow { get; }
+        DateTime Now { get; }
+    }
+
+    public class DateTimeService : IDateTime
+    {
+        public DateTime UtcNow => DateTime.UtcNow;
+        public DateTime Now => DateTime.Now;
+    }
+}

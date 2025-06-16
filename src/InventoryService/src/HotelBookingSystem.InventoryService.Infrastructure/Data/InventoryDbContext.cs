@@ -1,51 +1,38 @@
 using HotelBookingSystem.InventoryService.Domain.Entities;
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
+using System.Reflection;
 
 namespace HotelBookingSystem.InventoryService.Infrastructure.Data
 {
-    public class InventoryDbContext : DbContext
+    public class InventoryDbContext : DbContext, IInventoryDbContext
     {
         public InventoryDbContext(DbContextOptions<InventoryDbContext> options) : base(options)
         {
         }
 
-        public DbSet<RoomAvailability> RoomAvailabilities { get; set; }
-        public DbSet<RoomHold> RoomHolds { get; set; }
+        public DbSet<RoomInventory> RoomInventories { get; set; } = null!;
+        public DbSet<RoomHold> RoomHolds { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
-
-            modelBuilder.Entity<RoomAvailability>(entity =>
-            {
-                entity.HasKey(e => e.Id);
-                entity.Property(e => e.RoomTypeId).IsRequired();
-                entity.Property(e => e.Date).IsRequired();
-                entity.Property(e => e.Status).IsRequired();
-                entity.Property(e => e.CreatedAt).IsRequired();
-                entity.Property(e => e.UpdatedAt).IsRequired();
-
-                // Create unique index for RoomTypeId + Date combination
-                entity.HasIndex(e => new { e.RoomTypeId, e.Date }).IsUnique();
-            });
-
-            modelBuilder.Entity<RoomHold>(entity =>
-            {
-                entity.HasKey(e => e.Id);
-                entity.Property(e => e.HoldReference).IsRequired().HasMaxLength(100);
-                entity.Property(e => e.BookingId).IsRequired();
-                entity.Property(e => e.RoomTypeId).IsRequired();
-                entity.Property(e => e.StartDate).IsRequired();
-                entity.Property(e => e.EndDate).IsRequired();
-                entity.Property(e => e.ExpiresAt).IsRequired();
-                entity.Property(e => e.CreatedAt).IsRequired();
-
-                // Create unique index for HoldReference
-                entity.HasIndex(e => e.HoldReference).IsUnique();
-                
-                // Create index for BookingId lookups
-                entity.HasIndex(e => e.BookingId);
-            });
+            
+            // Apply entity configurations from assembly
+            modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
+            
+            // Add MassTransit inbox/outbox support for reliable messaging
+            modelBuilder.AddInboxStateEntity();
+            modelBuilder.AddOutboxStateEntity();
+            modelBuilder.AddOutboxMessageEntity();
         }
+    }
+
+    public interface IInventoryDbContext
+    {
+        DbSet<RoomInventory> RoomInventories { get; }
+        DbSet<RoomHold> RoomHolds { get; }
+        
+        Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
     }
 } 
