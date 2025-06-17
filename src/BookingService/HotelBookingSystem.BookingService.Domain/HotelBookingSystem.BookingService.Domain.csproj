@@ -10,4 +10,9 @@
     <PackageReference Include="MassTransit" Version="8.4.1" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\Shared\HotelBookingSystem.Contracts\HotelBookingSystem.Contracts.csproj" />
+    <ProjectReference Include="..\..\Shared\HotelBookingSystem.Domain.Core\HotelBookingSystem.Domain.Core.csproj" />
+  </ItemGroup>
+
 </Project>

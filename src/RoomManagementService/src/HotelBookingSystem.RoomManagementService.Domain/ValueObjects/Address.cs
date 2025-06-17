@@ -1,5 +1,5 @@
-﻿using HotelBookingSystem.RoomManagementService.Domain.Common.BaseTypes;
-using HotelBookingSystem.RoomManagementService.Domain.Common.Guards;
+﻿using HotelBookingSystem.Domain.Core.Common.BaseTypes;
+using HotelBookingSystem.Domain.Core.Common.Guards;
 
 namespace HotelBookingSystem.RoomManagementService.Domain.ValueObjects
 {

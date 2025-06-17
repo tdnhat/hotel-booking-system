@@ -37,9 +37,7 @@ namespace HotelBookingSystem.BookingService.Infrastructure
                         r.ExistingDbContext<BookingDbContext>(); // Use the same DbContext for the repository
                     });
 
-                config.AddConsumer<HoldRoomConsumer>();
                 config.AddConsumer<ProcessPaymentConsumer>();
-                config.AddConsumer<ReleaseRoomConsumer>();
 
                 // Configure RabbitMQ with Aspire connection string
                 config.UsingRabbitMq((context, cfg) =>

@@ -1,5 +1,5 @@
-using HotelBookingSystem.BookingService.Domain.Messages.Commands;
-using HotelBookingSystem.BookingService.Domain.Messages.Events;
+using HotelBookingSystem.Contracts.Commands;
+using HotelBookingSystem.Contracts.Events;
 using MassTransit;
 using Microsoft.Extensions.Logging;
 
@@ -40,8 +40,8 @@ namespace HotelBookingSystem.BookingService.Infrastructure.Consumers
                     await context.Publish<PaymentSucceeded>(new
                     {
                         BookingId = command.BookingId,
-                        PaymentReference = paymentReference,
-                        AmountPaid = command.Amount,
+                        TransactionId = paymentReference, // Use TransactionId instead of PaymentReference
+                        Amount = command.Amount, // Use Amount instead of AmountPaid
                         Currency = command.Currency,
                         ProcessedAt = DateTime.UtcNow
                     });
@@ -54,12 +54,13 @@ namespace HotelBookingSystem.BookingService.Infrastructure.Consumers
                     await context.Publish<PaymentFailed>(new
                     {
                         BookingId = command.BookingId,
+                        Amount = command.Amount, // Add missing Amount property
+                        Currency = command.Currency, // Add missing Currency property
                         Reason = "Payment failed - insufficient funds or card declined",
                         FailedAt = DateTime.UtcNow
                     });
                 }
-            }
-            catch (Exception ex)
+            }            catch (Exception ex)
             {
                 _logger.LogError(ex, "Error processing payment for Booking: {BookingId}", command.BookingId);
 
@@ -67,6 +68,8 @@ namespace HotelBookingSystem.BookingService.Infrastructure.Consumers
                 await context.Publish<PaymentFailed>(new
                 {
                     BookingId = command.BookingId,
+                    Amount = command.Amount, // Add missing Amount property
+                    Currency = command.Currency, // Add missing Currency property
                     Reason = $"Payment failed: {ex.Message}",
                     FailedAt = DateTime.UtcNow
                 });

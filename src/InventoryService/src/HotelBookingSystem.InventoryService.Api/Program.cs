@@ -1,3 +1,4 @@
+using HotelBookingSystem.InventoryService.Api.Extensions;
 using HotelBookingSystem.InventoryService.Application;
 using HotelBookingSystem.InventoryService.Infrastructure;
 using HotelBookingSystem.InventoryService.Infrastructure.Data;
@@ -36,7 +37,7 @@ try
         });
     });
 
-    // Add application and infrastructure services
+    // Add Application and Infrastructure services
     builder.Services
         .AddApplication()
         .AddInfrastructure(builder.Configuration);
@@ -55,20 +56,37 @@ try
 
     app.UseHttpsRedirection();
 
-    // Simple endpoint to check if service is running
-    app.MapGet("/", () => "InventoryService is running!")
-        .WithName("ServiceStatus")
-        .ExcludeFromDescription();
+    app.MapInventoryEndpoints();
 
     // Map default endpoints (includes health checks)
-    app.MapDefaultEndpoints();
-
-    // Auto-migrate database in development
+    app.MapDefaultEndpoints();    // Auto-migrate database in development
     if (app.Environment.IsDevelopment())
     {
         using var scope = app.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<InventoryDbContext>();
-        await context.Database.MigrateAsync();
+        
+        // Retry logic for database migrations
+        var maxRetries = 5;
+        var delay = TimeSpan.FromSeconds(2);
+        
+        for (int i = 0; i < maxRetries; i++)
+        {
+            try
+            {
+                Log.Information("Applying database migrations... (Attempt {Attempt}/{MaxRetries})", i + 1, maxRetries);
+                await context.Database.MigrateAsync();
+                Log.Information("Database migrations applied successfully");
+                break;
+            }
+            catch (Exception ex) when (i < maxRetries - 1)
+            {
+                Log.Warning(ex, "Failed to apply migrations on attempt {Attempt}/{MaxRetries}. Retrying in {Delay} seconds...", i + 1, maxRetries, delay.TotalSeconds);
+                await Task.Delay(delay);
+                delay = TimeSpan.FromSeconds(delay.TotalSeconds * 2); // Exponential backoff
+            }
+        }        // Seed initial inventory data
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        await InventoryDbSeeder.SeedAsync(context, logger);
     }
 
     Log.Information("Inventory Service started successfully");
@@ -83,4 +101,4 @@ catch (Exception ex)
 finally
 {
     Log.CloseAndFlush();
-}
+} 

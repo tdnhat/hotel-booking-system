@@ -60,14 +60,32 @@ try
     app.MapBookingEndpoints();
 
     // Map default endpoints (includes health checks)
-    app.MapDefaultEndpoints();
-
-    // Auto-migrate database in development
+    app.MapDefaultEndpoints();    // Auto-migrate database in development
     if (app.Environment.IsDevelopment())
     {
         using var scope = app.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<BookingDbContext>();
-        await context.Database.MigrateAsync();
+        
+        // Retry logic for database migrations
+        var maxRetries = 5;
+        var delay = TimeSpan.FromSeconds(2);
+        
+        for (int i = 0; i < maxRetries; i++)
+        {
+            try
+            {
+                Log.Information("Applying database migrations... (Attempt {Attempt}/{MaxRetries})", i + 1, maxRetries);
+                await context.Database.MigrateAsync();
+                Log.Information("Database migrations applied successfully");
+                break;
+            }
+            catch (Exception ex) when (i < maxRetries - 1)
+            {
+                Log.Warning(ex, "Failed to apply migrations on attempt {Attempt}/{MaxRetries}. Retrying in {Delay} seconds...", i + 1, maxRetries, delay.TotalSeconds);
+                await Task.Delay(delay);
+                delay = TimeSpan.FromSeconds(delay.TotalSeconds * 2); // Exponential backoff
+            }
+        }
     }
 
     Log.Information("Booking Service started successfully");
