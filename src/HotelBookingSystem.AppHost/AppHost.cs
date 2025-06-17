@@ -1,13 +1,11 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
-// Infrastructure services with persistence for development
+// Infrastructure services - containers will automatically stop with the application
 var postgres = builder.AddPostgres("postgres")
-    .WithImage("postgres")
-    .WithLifetime(ContainerLifetime.Persistent);
+    .WithImage("postgres");
 
 var rabbitmq = builder.AddRabbitMQ("rabbitmq")
-    .WithImage("rabbitmq")
-    .WithLifetime(ContainerLifetime.Persistent);
+    .WithImage("rabbitmq");
 
 // Databases
 var bookingDb = postgres.AddDatabase("bookingdb");

@@ -3,7 +3,6 @@ using HotelBookingSystem.InventoryService.Application.Commands.ReleaseRoomHold;
 using HotelBookingSystem.InventoryService.Application.Commands.ConfirmRoomBooking;
 using HotelBookingSystem.InventoryService.Application.Queries.CheckAvailability;
 using HotelBookingSystem.InventoryService.Application.Queries.GetRoomHold;
-using HotelBookingSystem.InventoryService.Api.Endpoints.Models;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
@@ -17,46 +16,42 @@ public static class InventoryEndpoints
             .WithTags("Inventory Management")
             .WithOpenApi();
 
+        // Health check endpoint
+        group.MapGet("/health", () => Results.Ok(new { Status = "Healthy", Service = "InventoryService" }))
+            .WithName("InventoryHealthCheck")
+            .WithSummary("Health check for inventory service");
+            
         // Availability endpoints
         group.MapPost("/availability/check", CheckAvailability)
             .WithName("CheckRoomAvailability")
             .WithSummary("Check room availability for specific dates")
-            .WithDescription("Checks availability and pricing for a room type on specified dates")
-            .Produces<CheckAvailabilityResponse>(StatusCodes.Status200OK)
-            .Produces<ValidationProblemDetails>(StatusCodes.Status400BadRequest)
-            .Produces(StatusCodes.Status404NotFound);
+            .Produces<object>(StatusCodes.Status200OK)
+            .Produces<ValidationProblemDetails>(StatusCodes.Status400BadRequest);
 
         // Hold management endpoints
         group.MapPost("/holds", CreateRoomHold)
             .WithName("CreateRoomHold")
             .WithSummary("Create a temporary room hold")
-            .WithDescription("Creates a temporary hold on rooms for a booking")
-            .Produces<CreateRoomHoldResponse>(StatusCodes.Status201Created)
-            .Produces<ValidationProblemDetails>(StatusCodes.Status400BadRequest)
-            .Produces(StatusCodes.Status409Conflict);
+            .Produces<object>(StatusCodes.Status201Created)
+            .Produces<ValidationProblemDetails>(StatusCodes.Status400BadRequest);
 
         group.MapGet("/holds/{holdId:guid}", GetRoomHold)
             .WithName("GetRoomHold")
             .WithSummary("Get room hold details")
-            .WithDescription("Retrieves details of a specific room hold")
-            .Produces<GetRoomHoldResponse>(StatusCodes.Status200OK)
+            .Produces<object>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound);
 
         group.MapPost("/holds/{holdId:guid}/release", ReleaseRoomHold)
             .WithName("ReleaseRoomHold")
             .WithSummary("Release a room hold")
-            .WithDescription("Releases a room hold, making the rooms available again")
             .Produces(StatusCodes.Status204NoContent)
-            .Produces(StatusCodes.Status404NotFound)
-            .Produces<ValidationProblemDetails>(StatusCodes.Status400BadRequest);
+            .Produces(StatusCodes.Status404NotFound);
 
         group.MapPost("/holds/{holdId:guid}/confirm", ConfirmRoomBooking)
             .WithName("ConfirmRoomBooking")
             .WithSummary("Confirm a room booking")
-            .WithDescription("Converts a room hold into a confirmed booking")
             .Produces(StatusCodes.Status204NoContent)
-            .Produces(StatusCodes.Status404NotFound)
-            .Produces<ValidationProblemDetails>(StatusCodes.Status400BadRequest);
+            .Produces(StatusCodes.Status404NotFound);
     }
 
     private static async Task<IResult> CheckAvailability(
@@ -65,34 +60,37 @@ public static class InventoryEndpoints
         ILogger<CheckAvailabilityQuery> logger,
         CancellationToken cancellationToken)
     {
-        logger.LogInformation("Checking availability for hotel {HotelId}, room type {RoomTypeId}, dates {CheckIn} to {CheckOut}",
-            request.HotelId, request.RoomTypeId, request.CheckIn, request.CheckOut);
-
-        var query = new CheckAvailabilityQuery
+        try
         {
-            HotelId = request.HotelId,
-            RoomTypeId = request.RoomTypeId,
-            CheckIn = request.CheckIn,
-            CheckOut = request.CheckOut,
-            RequestedRooms = request.RoomCount
-        };
+            logger.LogInformation("Checking availability for hotel {HotelId}, room type {RoomTypeId}",
+                request.HotelId, request.RoomTypeId);
 
-        var result = await sender.Send(query, cancellationToken);
-        
-        if (!result.IsSuccess)
-            return Results.BadRequest(new { Title = "Availability check failed", Detail = result.Error });
+            var query = new CheckAvailabilityQuery
+            {
+                HotelId = request.HotelId,
+                RoomTypeId = request.RoomTypeId,
+                CheckIn = request.CheckIn,
+                CheckOut = request.CheckOut,
+                RequestedRooms = request.RoomCount
+            };
 
-        var response = new CheckAvailabilityResponse
+            var result = await sender.Send(query, cancellationToken);
+            
+            if (!result.IsSuccess)
+                return Results.BadRequest(new { Title = "Availability check failed", Detail = result.Error });
+
+            return Results.Ok(new
+            {
+                IsAvailable = result.Value.IsAvailable,
+                AvailableRooms = result.Value.IsAvailable ? request.RoomCount : 0,
+                Message = result.Value.IsAvailable ? "Rooms available" : "Insufficient availability"
+            });
+        }
+        catch (Exception ex)
         {
-            IsAvailable = result.Value.IsAvailable,
-            AvailableRooms = result.Value.IsAvailable ? request.RoomCount : 0,
-            PricePerNight = result.Value.TotalAmount / (request.CheckOut - request.CheckIn).Days,
-            Currency = result.Value.Currency,
-            TotalPrice = result.Value.TotalAmount,
-            Message = result.Value.IsAvailable ? "Rooms available" : "Insufficient availability"
-        };
-
-        return Results.Ok(response);
+            logger.LogError(ex, "Error checking availability");
+            return Results.Problem("Internal server error");
+        }
     }
 
     private static async Task<IResult> CreateRoomHold(
@@ -101,34 +99,40 @@ public static class InventoryEndpoints
         ILogger<HoldRoomCommand> logger,
         CancellationToken cancellationToken)
     {
-        logger.LogInformation("Creating room hold for booking {BookingId}", request.BookingId);
-
-        var command = new HoldRoomCommand
+        try
         {
-            BookingId = request.BookingId,
-            HotelId = request.HotelId,
-            RoomTypeId = request.RoomTypeId,
-            CheckIn = request.CheckIn,
-            CheckOut = request.CheckOut,
-            RoomCount = request.RoomCount,
-            HoldDuration = request.HoldDuration
-        };
+            logger.LogInformation("Creating room hold for booking {BookingId}", request.BookingId);
 
-        var result = await sender.Send(command, cancellationToken);
-        
-        if (!result.IsSuccess)
-            return Results.BadRequest(new { Title = "Hold creation failed", Detail = result.Error });
+            var command = new HoldRoomCommand
+            {
+                BookingId = request.BookingId,
+                HotelId = request.HotelId,
+                RoomTypeId = request.RoomTypeId,
+                CheckIn = request.CheckIn,
+                CheckOut = request.CheckOut,
+                RoomCount = request.RoomCount,
+                HoldDuration = request.HoldDuration
+            };
 
-        var response = new CreateRoomHoldResponse
+            var result = await sender.Send(command, cancellationToken);
+            
+            if (!result.IsSuccess)
+                return Results.BadRequest(new { Title = "Hold creation failed", Detail = result.Error });
+
+            return Results.Created($"/api/v1/inventory/holds/{result.Value.Id}", new
+            {
+                Id = result.Value.Id,
+                BookingId = result.Value.BookingId,
+                Status = result.Value.Status,
+                ExpiresAt = result.Value.ExpiresAt,
+                HoldReference = result.Value.HoldReference
+            });
+        }
+        catch (Exception ex)
         {
-            Id = result.Value.Id,
-            BookingId = result.Value.BookingId,
-            Status = result.Value.Status,
-            ExpiresAt = result.Value.ExpiresAt,
-            HoldReference = result.Value.HoldReference
-        };
-
-        return Results.Created($"/api/v1/inventory/holds/{result.Value.Id}", response);
+            logger.LogError(ex, "Error creating room hold");
+            return Results.Problem("Internal server error");
+        }
     }
 
     private static async Task<IResult> GetRoomHold(
@@ -137,30 +141,30 @@ public static class InventoryEndpoints
         ILogger<GetRoomHoldQuery> logger,
         CancellationToken cancellationToken)
     {
-        logger.LogInformation("Getting room hold {HoldId}", holdId);
-
-        var query = new GetRoomHoldQuery { HoldId = holdId };
-        var result = await sender.Send(query, cancellationToken);
-        
-        if (!result.IsSuccess)
-            return Results.NotFound(new { Title = "Hold not found", Detail = result.Error });
-
-        var response = new GetRoomHoldResponse
+        try
         {
-            Id = result.Value.Id,
-            BookingId = result.Value.BookingId,
-            HotelId = result.Value.HotelId,
-            RoomTypeId = result.Value.RoomTypeId,
-            CheckIn = result.Value.CheckIn,
-            CheckOut = result.Value.CheckOut,
-            RoomCount = result.Value.RoomCount,
-            Status = result.Value.Status,
-            CreatedAt = result.Value.CreatedAt,
-            ExpiresAt = result.Value.ExpiresAt,
-            HoldReference = result.Value.HoldReference
-        };
+            logger.LogInformation("Getting room hold {HoldId}", holdId);
 
-        return Results.Ok(response);
+            var query = new GetRoomHoldQuery { HoldId = holdId };
+            var result = await sender.Send(query, cancellationToken);
+            
+            if (!result.IsSuccess)
+                return Results.NotFound(new { Title = "Hold not found", Detail = result.Error });
+
+            return Results.Ok(new
+            {
+                Id = result.Value.Id,
+                BookingId = result.Value.BookingId,
+                Status = result.Value.Status,
+                ExpiresAt = result.Value.ExpiresAt,
+                HoldReference = result.Value.HoldReference
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error getting room hold");
+            return Results.Problem("Internal server error");
+        }
     }
 
     private static async Task<IResult> ReleaseRoomHold(
@@ -170,20 +174,28 @@ public static class InventoryEndpoints
         ILogger<ReleaseRoomHoldCommand> logger,
         CancellationToken cancellationToken)
     {
-        logger.LogInformation("Releasing room hold {HoldId}", holdId);
-
-        var command = new ReleaseRoomHoldCommand
+        try
         {
-            BookingId = request.BookingId,
-            HoldId = holdId,
-            Reason = request.Reason ?? "Manual release"
-        };
+            logger.LogInformation("Releasing room hold {HoldId}", holdId);
 
-        var result = await sender.Send(command, cancellationToken);
-        
-        return result.IsSuccess 
-            ? Results.NoContent()
-            : Results.BadRequest(new { Title = "Hold release failed", Detail = result.Error });
+            var command = new ReleaseRoomHoldCommand
+            {
+                BookingId = request.BookingId,
+                HoldId = holdId,
+                Reason = request.Reason ?? "Manual release"
+            };
+
+            var result = await sender.Send(command, cancellationToken);
+            
+            return result.IsSuccess 
+                ? Results.NoContent()
+                : Results.BadRequest(new { Title = "Hold release failed", Detail = result.Error });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error releasing room hold");
+            return Results.Problem("Internal server error");
+        }
     }
 
     private static async Task<IResult> ConfirmRoomBooking(
@@ -193,24 +205,32 @@ public static class InventoryEndpoints
         ILogger<ConfirmRoomBookingCommand> logger,
         CancellationToken cancellationToken)
     {
-        logger.LogInformation("Confirming room booking for hold {HoldId}", holdId);
-
-        var command = new ConfirmRoomBookingCommand
+        try
         {
-            BookingId = request.BookingId,
-            HoldId = holdId,
-            PaymentId = request.PaymentId
-        };
+            logger.LogInformation("Confirming room booking for hold {HoldId}", holdId);
 
-        var result = await sender.Send(command, cancellationToken);
-        
-        return result.IsSuccess 
-            ? Results.NoContent()
-            : Results.BadRequest(new { Title = "Booking confirmation failed", Detail = result.Error });
+            var command = new ConfirmRoomBookingCommand
+            {
+                BookingId = request.BookingId,
+                HoldId = holdId,
+                PaymentId = request.PaymentId
+            };
+
+            var result = await sender.Send(command, cancellationToken);
+            
+            return result.IsSuccess 
+                ? Results.NoContent()
+                : Results.BadRequest(new { Title = "Booking confirmation failed", Detail = result.Error });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error confirming room booking");
+            return Results.Problem("Internal server error");
+        }
     }
 }
 
-// Request/Response models for API contracts
+// Request DTOs
 public record CheckAvailabilityRequest
 {
     public Guid HotelId { get; init; }

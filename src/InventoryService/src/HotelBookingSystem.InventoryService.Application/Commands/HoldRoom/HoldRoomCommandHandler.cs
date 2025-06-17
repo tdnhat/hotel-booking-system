@@ -69,9 +69,7 @@ public class HoldRoomCommandHandler : IRequestHandler<HoldRoomCommand, Result<Ro
             _logger.LogError(ex, "Error creating room hold for booking {BookingId}", request.BookingId);
             return Result.Failure<RoomHoldDto>($"Failed to create room hold: {ex.Message}");
         }
-    }
-
-    private static RoomHoldDto MapToDto(RoomHold roomHold)
+    }    private static RoomHoldDto MapToDto(RoomHold roomHold)
     {
         return new RoomHoldDto
         {
@@ -85,6 +83,7 @@ public class HoldRoomCommandHandler : IRequestHandler<HoldRoomCommand, Result<Ro
             TotalAmount = roomHold.TotalAmount.Amount,
             Currency = roomHold.TotalAmount.Currency.ToString(),
             Status = roomHold.Status.ToString(),
+            HoldReference = roomHold.HoldReference, // This was missing!
             CreatedAt = roomHold.CreatedAt,
             ExpiresAt = roomHold.ExpiresAt,
             ConfirmedAt = roomHold.ConfirmedAt,

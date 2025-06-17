@@ -18,7 +18,14 @@ public class RoomInventory : Entity<InventoryId>
     public Money CurrentPrice { get; private set; }
     public DateTime LastUpdated { get; private set; }
 
-    private RoomInventory() { } // EF Core constructor
+    private RoomInventory() 
+    { 
+        // EF Core constructor - properties will be set by EF Core
+        HotelId = null!;
+        RoomTypeId = null!;
+        BasePrice = null!;
+        CurrentPrice = null!;
+    }
 
     public RoomInventory(
         InventoryId id,
@@ -38,9 +45,8 @@ public class RoomInventory : Entity<InventoryId>
         TotalRooms = totalRooms;
         AvailableRooms = totalRooms;
         HeldRooms = 0;
-        BookedRooms = 0;
-        BasePrice = basePrice;
-        CurrentPrice = basePrice;
+        BookedRooms = 0;        BasePrice = basePrice;
+        CurrentPrice = new Money(basePrice.Amount, basePrice.Currency); // Create separate instance
         LastUpdated = DateTime.UtcNow;
     }
 

@@ -1,3 +1,4 @@
+using HotelBookingSystem.InventoryService.Application.Interfaces;
 using HotelBookingSystem.InventoryService.Domain.Entities;
 using HotelBookingSystem.InventoryService.Domain.Repositories;
 using HotelBookingSystem.InventoryService.Domain.ValueObjects;
@@ -6,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HotelBookingSystem.InventoryService.Infrastructure.Repositories;
 
-public class RoomInventoryRepository : IRoomInventoryRepository
+public class RoomInventoryRepository : Domain.Repositories.IRoomInventoryRepository
 {
     private readonly IInventoryDbContext _context;
 

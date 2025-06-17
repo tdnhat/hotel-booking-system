@@ -1,8 +1,9 @@
 using HotelBookingSystem.BookingService.Domain.Entities;
-using HotelBookingSystem.BookingService.Domain.Messages.Commands;
+using HotelBookingSystem.Contracts.Commands;
 using HotelBookingSystem.BookingService.Domain.Messages.Events;
 using MassTransit;
 using Microsoft.Extensions.Logging;
+using ContractEvents = HotelBookingSystem.Contracts.Events;
 
 namespace HotelBookingSystem.BookingService.Infrastructure.Saga
 {
@@ -20,15 +21,13 @@ namespace HotelBookingSystem.BookingService.Infrastructure.Saga
         public State PaymentProcessing { get; private set; } = null!;
         public State RoomReleaseRequested { get; private set; } = null!;
         public State Confirmed { get; private set; } = null!;
-        public State Failed { get; private set; } = null!;
-
-        // Event declarations
+        public State Failed { get; private set; } = null!;        // Event declarations
         public Event<BookingRequested> BookingRequested { get; private set; } = null!;
-        public Event<RoomHeld> RoomHeld { get; private set; } = null!;
-        public Event<RoomHoldFailed> RoomHoldFailed { get; private set; } = null!;
-        public Event<PaymentSucceeded> PaymentSucceeded { get; private set; } = null!;
-        public Event<PaymentFailed> PaymentFailed { get; private set; } = null!;
-        public Event<RoomReleased> RoomReleased { get; private set; } = null!;
+        public Event<ContractEvents.RoomHeld> RoomHeld { get; private set; } = null!;
+        public Event<ContractEvents.RoomHoldFailed> RoomHoldFailed { get; private set; } = null!;
+        public Event<ContractEvents.PaymentSucceeded> PaymentSucceeded { get; private set; } = null!;
+        public Event<ContractEvents.PaymentFailed> PaymentFailed { get; private set; } = null!;
+        public Event<ContractEvents.RoomReleased> RoomReleased { get; private set; } = null!;
 
         public BookingSagaStateMachine(ILogger<BookingSagaStateMachine> logger)
         {
@@ -147,17 +146,16 @@ namespace HotelBookingSystem.BookingService.Infrastructure.Saga
             );
 
             // Payment processing responses
-            During(PaymentProcessing,
-                When(PaymentSucceeded)
+            During(PaymentProcessing,                When(PaymentSucceeded)
                     .Then(context =>
                     {
-                        context.Saga.PaymentReference = context.Message.PaymentReference;
+                        context.Saga.PaymentReference = context.Message.TransactionId; // Use TransactionId from contract
                         context.Saga.UpdatedAt = DateTime.UtcNow;
 
                         _logger.LogInformation(
                             "Payment successful for BookingId: {BookingId}, PaymentReference: {PaymentReference}, " +
                             "Amount: {Amount}, Guest: {GuestEmail}",
-                            context.Saga.BookingId, context.Message.PaymentReference,
+                            context.Saga.BookingId, context.Message.TransactionId,
                             context.Saga.TotalPrice, context.Saga.GuestEmail);
                     })
                     .TransitionTo(Confirmed), // Success - keep for status queries

@@ -1,6 +1,9 @@
+using HotelBookingSystem.InventoryService.Application.Interfaces;
 using HotelBookingSystem.InventoryService.Domain.Entities;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Design;
+using Microsoft.Extensions.Configuration;
 using System.Reflection;
 
 namespace HotelBookingSystem.InventoryService.Infrastructure.Data
@@ -28,11 +31,24 @@ namespace HotelBookingSystem.InventoryService.Infrastructure.Data
         }
     }
 
-    public interface IInventoryDbContext
+    // Design-time factory for Entity Framework migrations
+    public class InventoryDbContextFactory : IDesignTimeDbContextFactory<InventoryDbContext>
     {
-        DbSet<RoomInventory> RoomInventories { get; }
-        DbSet<RoomHold> RoomHolds { get; }
-        
-        Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
+        public InventoryDbContext CreateDbContext(string[] args)
+        {
+            var configuration = new ConfigurationBuilder()
+                .SetBasePath(Path.Combine(Directory.GetCurrentDirectory(), "../HotelBookingSystem.InventoryService.Api"))
+                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+                .AddJsonFile("appsettings.Development.json", optional: true)
+                .AddEnvironmentVariables()
+                .Build();
+
+            var optionsBuilder = new DbContextOptionsBuilder<InventoryDbContext>();
+            var connectionString = configuration.GetConnectionString("inventorydb");
+            
+            optionsBuilder.UseNpgsql(connectionString);
+
+            return new InventoryDbContext(optionsBuilder.Options);
+        }
     }
 } 

@@ -1,5 +1,7 @@
+using HotelBookingSystem.InventoryService.Application.Interfaces;
 using HotelBookingSystem.InventoryService.Domain.Repositories;
 using HotelBookingSystem.InventoryService.Domain.Services;
+using HotelBookingSystem.InventoryService.Infrastructure.Consumers;
 using HotelBookingSystem.InventoryService.Infrastructure.Data;
 using HotelBookingSystem.InventoryService.Infrastructure.Repositories;
 using HotelBookingSystem.InventoryService.Infrastructure.Services;
@@ -18,12 +20,12 @@ namespace HotelBookingSystem.InventoryService.Infrastructure
             services.AddDbContext<InventoryDbContext>(options => options.UseNpgsql(configuration.GetConnectionString("inventorydb")));
 
             // Register DbContext interface
-            services.AddScoped<IInventoryDbContext>(provider =>
+            services.AddScoped<Application.Interfaces.IInventoryDbContext>(provider =>
                 provider.GetRequiredService<InventoryDbContext>());
 
             // Add repositories
-            services.AddScoped<IRoomInventoryRepository, RoomInventoryRepository>();
-            services.AddScoped<IRoomHoldRepository, RoomHoldRepository>();
+            services.AddScoped<Domain.Repositories.IRoomInventoryRepository, RoomInventoryRepository>();
+            services.AddScoped<Domain.Repositories.IRoomHoldRepository, RoomHoldRepository>();
 
             // Add domain services
             services.AddScoped<IInventoryDomainService, InventoryDomainService>();
@@ -35,7 +37,8 @@ namespace HotelBookingSystem.InventoryService.Infrastructure
             services.AddMassTransit(config =>
             {
                 // Add consumers
-                config.AddConsumersFromNamespaceContaining<Consumers.HoldRoomConsumer>();
+                config.AddConsumer<HoldRoomConsumer>();
+                config.AddConsumer<ReleaseRoomConsumer>();
 
                 config.UsingRabbitMq((context, cfg) =>
                 {
